@@ -1,0 +1,21 @@
+# 忽略Next.js的构建输出目录
+frontend/.next/
+node_modules/
+# 忽略团队环境下的后端本地配置
+apps/backend/uploads/
+/backend/uploads/resumes/
+.next/
+frontend/next/
+
+.idea
+.env
+# 本地环境变量备份（保留示例配置）
+.env_*
+.env.bak*
+# 本地编译产物与检查日志
+/backend/main
+/backend/server.exe
+/frontend/lint.log
+/frontend/tsc_output.txt
+# 忽略营销文档
+doc/营销/

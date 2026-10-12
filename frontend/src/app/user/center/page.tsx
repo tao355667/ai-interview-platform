@@ -1,28 +1,17 @@
 'use client';
 
-import { UploadOutlined, FileOutlined, DeleteOutlined, InboxOutlined } from '@ant-design/icons';
-import { useEffect, useState, useCallback } from 'react';
+import { FileText, Inbox, LoaderCircle, Trash2, Upload as UploadIcon } from 'lucide-react';
+import { useEffect, useState, useCallback, useMemo } from 'react';
 
 import type { UploadProps } from 'antd';
-import {
-  Typography,
-  Row,
-  Col,
-  Avatar,
-  Tag,
-  Button,
-  Upload,
-  message,
-  Spin,
-  Popconfirm,
-  Table,
-  Space,
-} from 'antd';
+import { Avatar, Tag, Button, Upload, message, Popconfirm, Skeleton, Tooltip } from 'antd';
 import apiClient from '@/services/api/client';
 import { USER_API, RESUME_API } from '@/config/api';
+import PageHeader from '@/components/common/PageHeader';
 
 const { Dragger } = Upload;
-const { Title } = Typography;
+
+const MAX_RESUMES = 3;
 
 // 简历信息类型
 interface ResumeInfo {
@@ -38,70 +27,70 @@ interface ResumeInfo {
   error_msg?: string;
 }
 
+// 格式化文件大小
+const formatFileSize = (bytes: number) => {
+  if (bytes < 1024) return bytes + ' B';
+  if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+  return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+};
+
+// 格式化时间
+const formatTime = (timestamp: number) => {
+  const date = new Date(timestamp * 1000);
+  return date.toLocaleDateString('zh-CN', {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  });
+};
+
+function ResumeStatusTag({ resume }: { resume: ResumeInfo }) {
+  if (resume.status === 'pending') {
+    return (
+      <Tag color="processing" bordered={false} className="m-0">
+        待解析
+      </Tag>
+    );
+  }
+  if (resume.status === 'processing') {
+    return (
+      <Tag
+        color="processing"
+        bordered={false}
+        icon={
+          <LoaderCircle
+            className="mr-1 inline-block h-3 w-3 align-[-0.125em] animate-spin"
+            aria-hidden="true"
+          />
+        }
+        className="m-0"
+      >
+        解析中
+      </Tag>
+    );
+  }
+  if (resume.status === 'failed') {
+    return (
+      <Tooltip title={resume.error_msg || '解析失败'}>
+        <Tag color="error" bordered={false} className="m-0">
+          解析失败
+        </Tag>
+      </Tooltip>
+    );
+  }
+  return null;
+}
+
 export default function UserCenterPage() {
   const [profile, setProfile] = useState<{ id?: number; username?: string; email?: string } | null>(
     null
   );
-
-  const columns = [
-    {
-      title: 'Order ID',
-      dataIndex: 'id',
-      key: 'id',
-      render: (text: string) => <span className="text-slate-500 font-mono">{text}</span>,
-    },
-    {
-      title: 'Type',
-      dataIndex: 'type',
-      key: 'type',
-      render: (text: string) => <span className="font-medium text-slate-700">{text}</span>,
-    },
-    {
-      title: 'Amount',
-      dataIndex: 'amount',
-      key: 'amount',
-      render: (amount: number) => <span className="text-slate-900 font-bold">¥{amount}</span>,
-    },
-    {
-      title: 'Status',
-      dataIndex: 'status',
-      key: 'status',
-      render: () => (
-        <Tag color="success" className="border-0 bg-green-50 text-green-600 rounded-full px-3">
-          {'Success'}
-        </Tag>
-      ),
-    },
-    {
-      title: 'Time',
-      dataIndex: 'time',
-      key: 'time',
-      render: (text: string) => <span className="text-slate-400 text-sm">{text}</span>,
-    },
-  ];
-
-  const data = [
-    {
-      key: '1',
-      id: 'ORDER_20241101_001',
-      type: 'VIP Monthly Pass',
-      amount: 29.9,
-      status: 'success',
-      time: '2024-11-01 12:30:00',
-    },
-    {
-      key: '2',
-      id: 'ORDER_20241005_008',
-      type: 'Interview Boost Pack',
-      amount: 9.9,
-      status: 'success',
-      time: '2024-10-05 09:15:00',
-    },
-  ];
+  const [profileLoading, setProfileLoading] = useState(true);
 
   const [resumes, setResumes] = useState<ResumeInfo[]>([]);
   const [uploading, setUploading] = useState(false);
   const [loadingResumes, setLoadingResumes] = useState(false);
+  const [resumesLoaded, setResumesLoaded] = useState(false);
 
   // 获取简历列表
   const fetchResumes = useCallback(async () => {
@@ -113,13 +102,14 @@ export default function UserCenterPage() {
       console.error('获取简历列表失败:', err);
     } finally {
       setLoadingResumes(false);
+      setResumesLoaded(true);
     }
   }, []);
 
   // 上传简历（异步处理）
   const handleUpload = async (file: File) => {
-    if (resumes.length >= 3) {
-      message.warning('Max 3 resumes allowed');
+    if (resumes.length >= MAX_RESUMES) {
+      message.warning('最多只能上传 3 份简历');
       return false;
     }
 
@@ -135,17 +125,17 @@ export default function UserCenterPage() {
 
       // 检查返回状态
       if (res?.status === 'pending' || res?.status === 'processing') {
-        message.info('Uploaded, parsing...');
+        message.info('简历已上传，正在解析');
         // 开始轮询检查状态
         if (res?.resume_id) {
           pollResumeStatus(res.resume_id);
         }
       } else {
-        message.success('Resume uploaded successfully');
+        message.success('简历上传成功');
       }
       fetchResumes();
     } catch (err: any) {
-      message.error(err?.message || 'Resume upload failed');
+      message.error(err?.message || '简历上传失败');
     } finally {
       setUploading(false);
     }
@@ -165,18 +155,18 @@ export default function UserCenterPage() {
         const resume = data?.resume;
 
         if (resume?.status === 'completed') {
-          message.success('Parsing completed');
+          message.success('简历解析完成');
           fetchResumes();
           return;
         } else if (resume?.status === 'failed') {
-          message.error(`${'Parsing failed'}: ${resume?.error_msg || 'Unknown error'}`);
+          message.error(`简历解析失败：${resume?.error_msg || '未知错误'}`);
           fetchResumes();
           return;
         } else if (attempts < maxAttempts) {
           // 继续轮询
           setTimeout(poll, interval);
         } else {
-          message.warning('Parsing timeout, please refresh later');
+          message.warning('简历解析超时，请稍后刷新页面查看');
           fetchResumes();
         }
       } catch (err) {
@@ -195,10 +185,10 @@ export default function UserCenterPage() {
   const handleSetDefault = async (resumeId: number) => {
     try {
       await apiClient.post(RESUME_API.SET_DEFAULT, { resume_id: resumeId });
-      message.success('Default resume set');
+      message.success('已设为默认简历');
       fetchResumes();
     } catch (err: any) {
-      message.error(err?.message || 'Failed to set default');
+      message.error(err?.message || '设置默认简历失败');
     }
   };
 
@@ -206,28 +196,11 @@ export default function UserCenterPage() {
   const handleDelete = async (resumeId: number) => {
     try {
       await apiClient.delete(RESUME_API.DELETE(resumeId));
-      message.success('Resume deleted');
+      message.success('简历已删除');
       fetchResumes();
     } catch (err: any) {
-      message.error(err?.message || 'Delete failed');
+      message.error(err?.message || '删除失败');
     }
-  };
-
-  // 格式化文件大小
-  const formatFileSize = (bytes: number) => {
-    if (bytes < 1024) return bytes + ' B';
-    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
-    return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
-  };
-
-  // 格式化时间
-  const formatTime = (timestamp: number) => {
-    const date = new Date(timestamp * 1000);
-    return date.toLocaleDateString('zh-CN', {
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit',
-    });
   };
 
   // 上传配置
@@ -238,204 +211,206 @@ export default function UserCenterPage() {
     beforeUpload: handleUpload,
   };
 
+  // 最新上传的简历视为默认简历
+  const latestId = useMemo(
+    () =>
+      resumes.length > 0 ? resumes.reduce((a, b) => (a.created_at > b.created_at ? a : b)).id : -1,
+    [resumes]
+  );
+
   useEffect(() => {
     (async () => {
       try {
         const data: any = await apiClient.get(USER_API.GET_PROFILE);
         setProfile(data || null);
-      } catch {}
+      } catch {
+      } finally {
+        setProfileLoading(false);
+      }
     })();
     fetchResumes();
   }, [fetchResumes]);
 
+  const displayName = profile?.username || '未登录';
+  const canUpload = resumes.length < MAX_RESUMES;
+  const showResumeSkeleton = loadingResumes && !resumesLoaded;
+
   return (
-    <div className="min-h-screen relative font-sans">
-      {/* Decorative Background */}
-      <div className="fixed top-0 right-0 w-[600px] h-[600px] bg-blue-50/60 rounded-full blur-[120px] -translate-y-1/2 translate-x-1/3 pointer-events-none z-0" />
-      <div className="fixed bottom-0 left-0 w-[600px] h-[600px] bg-purple-50/60 rounded-full blur-[120px] translate-y-1/2 -translate-x-1/3 pointer-events-none z-0" />
+    <div className="page py-10">
+      <PageHeader title="个人中心" description="管理你的个人信息和简历" />
 
-      <div className="container mx-auto px-4 relative z-10">
-        <div className="mb-8 animate-fade-in-up">
-          <h1 className="text-3xl font-extrabold text-slate-900 tracking-tight">{'User Center'}</h1>
-          <p className="text-slate-500 mt-2">{'Manage your personal info, resumes, and records'}</p>
-        </div>
-
-        <Row gutter={[24, 24]}>
-          <Col xs={24} md={8} className="animate-fade-in-up" style={{ animationDelay: '0.1s' }}>
-            <div className="bg-white rounded-3xl p-8 border border-slate-100 shadow-xl shadow-slate-200/50 relative overflow-hidden">
-              <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-blue-50 to-indigo-50 rounded-bl-full -mr-8 -mt-8 z-0" />
-
-              <div className="relative z-10 flex flex-col items-center text-center">
-                <div className="p-1 rounded-full bg-gradient-to-br from-blue-100 to-indigo-100 mb-4">
-                  <Avatar
-                    size={80}
-                    src="https://api.dicebear.com/7.x/adventurer/svg?seed=LB"
-                    className="border-4 border-white shadow-md"
-                  />
-                </div>
-                <h2 className="text-xl font-bold text-slate-800 mb-1">
-                  {profile?.username || 'Not logged in'}
-                </h2>
-                <Tag
-                  color="blue"
-                  className="border-0 bg-blue-50 text-blue-600 px-3 py-1 rounded-full font-medium"
+      <div className="grid grid-cols-1 items-start gap-6 md:grid-cols-[280px_minmax(0,1fr)]">
+        {/* 个人信息 */}
+        <aside className="surface p-5">
+          {profileLoading ? (
+            <Skeleton avatar active paragraph={{ rows: 2 }} />
+          ) : (
+            <>
+              <div className="flex items-center gap-3">
+                <Avatar
+                  size={56}
+                  className="shrink-0 bg-brand-50 text-xl font-semibold text-brand-800"
                 >
-                  {'Member'}
-                </Tag>
-
-                <div className="w-full mt-8 space-y-3 text-left bg-slate-50/50 rounded-2xl p-4 border border-slate-100">
-                  <div className="flex justify-between items-center text-sm">
-                    <span className="text-slate-500">{'Username'}</span>
-                    <span className="font-medium text-slate-700">{profile?.username ?? '-'}</span>
-                  </div>
-                  <div className="flex justify-between items-center text-sm">
-                    <span className="text-slate-500">{'Bound Email'}</span>
-                    <span className="font-medium text-slate-700">{profile?.email ?? '-'}</span>
+                  {displayName.slice(0, 1).toUpperCase()}
+                </Avatar>
+                <div className="min-w-0">
+                  <div className="truncate text-base font-semibold text-ink">{displayName}</div>
+                  <div className="truncate text-sm text-ink-secondary">
+                    {profile?.email || '未绑定邮箱'}
                   </div>
                 </div>
               </div>
-            </div>
-          </Col>
 
-          <Col xs={24} md={16} className="animate-fade-in-up" style={{ animationDelay: '0.2s' }}>
-            <Row gutter={[16, 16]}>
-              <Col span={24}>
-                <div className="bg-white rounded-3xl p-8 border border-slate-100 shadow-xl shadow-slate-200/50">
-                  <div className="flex items-center justify-between mb-6">
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-xl bg-blue-50 flex items-center justify-center text-blue-600 text-xl">
-                        <FileOutlined />
-                      </div>
-                      <div>
-                        <h3 className="text-lg font-bold text-slate-800">{'My Resumes'}</h3>
-                        <p className="text-xs text-slate-400">Uploaded {resumes.length}/3</p>
-                      </div>
-                    </div>
-                  </div>
-
-                  <Spin spinning={loadingResumes}>
-                    {resumes.length > 0 ? (
-                      <div className="space-y-3 mb-6">
-                        {resumes.map((resume) => {
-                          const latestId = resumes.length > 0
-                            ? resumes.reduce((a, b) => (a.created_at > b.created_at ? a : b)).id
-                            : -1;
-                          const isDefault = resume.id === latestId;
-                          return (                          <div
-                            key={resume.id}
-                            className="group flex items-center justify-between p-4 bg-slate-50 hover:bg-blue-50/50 border border-slate-100 hover:border-blue-100 rounded-2xl transition-all duration-300"
-                          >
-                            <div className="flex items-center gap-4">
-                              <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center text-red-500 shadow-sm">
-                                <FileOutlined className="text-lg" />
-                              </div>
-                              <div>
-                                <div className="font-medium text-slate-700 group-hover:text-blue-700 transition-colors flex items-center gap-2">
-                                  {resume.file_name}
-                                  {/* 状态标签 */}
-                                  {resume.status === 'pending' && (
-                                    <Tag color="processing" className="ml-2 border-0">
-                                      Pending
-                                    </Tag>
-                                  )}
-                                  {resume.status === 'processing' && (
-                                    <Tag
-                                      color="processing"
-                                      icon={<Spin size="small" className="mr-1" />}
-                                      className="ml-2 border-0"
-                                    >
-                                      Processing...
-                                    </Tag>
-                                  )}
-                                  {resume.status === 'failed' && (
-                                    <Tag
-                                      color="error"
-                                      className="ml-2 border-0"
-                                      title={resume.error_msg}
-                                    >
-                                      Failed
-                                    </Tag>
-                                  )}
-                                </div>
-                                <div className="text-xs text-slate-400 flex gap-2 mt-1">
-                                  <span>{formatFileSize(resume.file_size)}</span>
-                                  <span>•</span>
-                                  <span>{formatTime(resume.created_at)}</span>
-                                </div>
-                              </div>
-                            </div>
-                            <Space>
-                              {!isDefault && (
-                                <Button
-                                  type="text"
-                                  size="small"
-                                  onClick={() => handleSetDefault(resume.id)}
-                                  className="opacity-0 group-hover:opacity-100 transition-opacity text-blue-600 bg-white shadow-sm border border-blue-100"
-                                >
-                                  {'Set Default'}
-                                </Button>
-                              )}
-                              {isDefault ? (
-                                <Tag color="blue" className="m-0 border-0 bg-blue-50 text-blue-600">
-                                  Default
-                                </Tag>
-                              ) : null}
-                              <Popconfirm
-                                title={'Are you sure you want to delete this resume?'}
-                                onConfirm={() => handleDelete(resume.id)}
-                                okText="Yes"
-                                cancelText="No"
-                              >
-                                <Button
-                                  type="text"
-                                  size="small"
-                                  danger
-                                  icon={<DeleteOutlined />}
-                                  className="opacity-0 group-hover:opacity-100 transition-opacity bg-white shadow-sm border border-red-100"
-                                />
-                              </Popconfirm>
-                            </Space>
-                          </div>
-                        );
-                        })}
-                      </div>
-                    ) : null}
-
-                    {/* 上传区域 */}
-                    {resumes.length < 3 && (
-                      <>
-                        <Dragger
-                          {...uploadProps}
-                          disabled={uploading}
-                          className="[&]:!border-0 [&]:!border-none rounded-2xl overflow-hidden"
-                          style={{ padding: '40px 0', background: 'rgb(248 250 252)' }}
-                        >
-                          <p className="ant-upload-drag-icon text-blue-500 mb-4">
-                            {uploading ? (
-                              <Spin />
-                            ) : (
-                              <InboxOutlined style={{ fontSize: '48px', color: '#3b82f6' }} />
-                            )}
-                          </p>
-                          <p className="text-base font-medium text-slate-700 mb-2">
-                            {uploading ? 'Uploaded, parsing...' : 'Upload Resume'}
-                          </p>
-                          <p className="text-sm text-slate-400">{'PDF supported, max 10MB'}</p>
-                        </Dragger>
-                      </>
-                    )}
-
-                    {resumes.length >= 3 && (
-                      <div className="text-center text-slate-400 py-8 bg-slate-50 rounded-2xl border border-dashed border-slate-200">
-                        {'Max 3 resumes allowed'}
-                      </div>
-                    )}
-                  </Spin>
+              <dl className="mt-5 space-y-3 border-t border-line pt-4 text-sm">
+                <div className="flex items-center justify-between gap-3">
+                  <dt className="text-ink-secondary">用户名</dt>
+                  <dd className="truncate text-ink">{profile?.username ?? '-'}</dd>
                 </div>
-              </Col>
-            </Row>
-          </Col>
-        </Row>
+                <div className="flex items-center justify-between gap-3">
+                  <dt className="text-ink-secondary">绑定邮箱</dt>
+                  <dd className="truncate text-ink">{profile?.email ?? '-'}</dd>
+                </div>
+                {profile?.id !== undefined && (
+                  <div className="flex items-center justify-between gap-3">
+                    <dt className="text-ink-secondary">用户 ID</dt>
+                    <dd className="font-mono text-ink tabular-nums">{profile.id}</dd>
+                  </div>
+                )}
+              </dl>
+            </>
+          )}
+        </aside>
+
+        {/* 我的简历 */}
+        <section className="surface">
+          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-line px-5 py-4">
+            <div>
+              <h2 className="text-base font-semibold text-ink">我的简历</h2>
+              <p className="mt-0.5 text-xs text-ink-secondary">
+                已上传{' '}
+                <span className="tabular-nums">
+                  {resumes.length}/{MAX_RESUMES}
+                </span>
+                ，最新上传的简历将作为默认简历
+              </p>
+            </div>
+            {canUpload && resumes.length > 0 && (
+              <Upload {...uploadProps} disabled={uploading}>
+                <Button
+                  icon={<UploadIcon className="h-4 w-4" aria-hidden="true" />}
+                  loading={uploading}
+                >
+                  上传简历
+                </Button>
+              </Upload>
+            )}
+          </div>
+
+          <div className="p-5">
+            {showResumeSkeleton ? (
+              <Skeleton active paragraph={{ rows: 3 }} />
+            ) : resumes.length > 0 ? (
+              <ul className="divide-y divide-line rounded-lg border border-line">
+                {resumes.map((resume) => {
+                  const isDefault = resume.id === latestId;
+                  return (
+                    <li
+                      key={resume.id}
+                      className="flex flex-col gap-3 px-4 py-3 sm:flex-row sm:items-center sm:justify-between"
+                    >
+                      <div className="flex min-w-0 items-center gap-3">
+                        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-brand-50 text-base text-brand-800">
+                          <FileText className="h-[1em] w-[1em] shrink-0" aria-hidden="true" />
+                        </div>
+                        <div className="min-w-0">
+                          <div className="flex min-w-0 flex-wrap items-center gap-2">
+                            <span
+                              className="truncate text-sm font-medium text-ink"
+                              title={resume.file_name}
+                            >
+                              {resume.file_name}
+                            </span>
+                            {isDefault && (
+                              <Tag bordered={false} className="m-0 bg-brand-50 text-brand-800">
+                                默认
+                              </Tag>
+                            )}
+                            <ResumeStatusTag resume={resume} />
+                          </div>
+                          <div className="mt-0.5 flex gap-2 text-xs text-ink-secondary tabular-nums">
+                            <span>{formatFileSize(resume.file_size)}</span>
+                            <span aria-hidden>·</span>
+                            <span>{formatTime(resume.created_at)}</span>
+                          </div>
+                        </div>
+                      </div>
+                      <div className="flex shrink-0 items-center gap-1 self-end sm:self-auto">
+                        {!isDefault && (
+                          <Button
+                            type="link"
+                            size="small"
+                            onClick={() => handleSetDefault(resume.id)}
+                          >
+                            设为默认
+                          </Button>
+                        )}
+                        <Popconfirm
+                          title="删除这份简历？"
+                          description="删除后无法恢复"
+                          onConfirm={() => handleDelete(resume.id)}
+                          okText="删除"
+                          cancelText="取消"
+                          okButtonProps={{ danger: true }}
+                        >
+                          <Button
+                            type="text"
+                            size="small"
+                            danger
+                            icon={<Trash2 className="h-4 w-4" aria-hidden="true" />}
+                          >
+                            删除
+                          </Button>
+                        </Popconfirm>
+                      </div>
+                    </li>
+                  );
+                })}
+              </ul>
+            ) : (
+              <Dragger {...uploadProps} disabled={uploading}>
+                <p className="ant-upload-drag-icon">
+                  {uploading ? (
+                    <LoaderCircle
+                      className="inline-block text-brand-600 animate-spin"
+                      size={48}
+                      strokeWidth={1.75}
+                      aria-hidden="true"
+                    />
+                  ) : (
+                    <Inbox
+                      className="inline-block text-brand-600"
+                      size={48}
+                      strokeWidth={1.75}
+                      aria-hidden="true"
+                    />
+                  )}
+                </p>
+                <p className="ant-upload-text">
+                  {uploading ? '正在上传…' : '还没有简历，点击或拖拽 PDF 文件到这里上传'}
+                </p>
+                <p className="ant-upload-hint">
+                  支持 PDF 格式，最大 10MB。上传后可用于简历押题和模拟面试
+                </p>
+              </Dragger>
+            )}
+
+            {!canUpload && (
+              <p className="mt-4 text-sm text-ink-secondary">
+                最多只能上传 3 份简历，删除旧简历后可继续上传。
+              </p>
+            )}
+          </div>
+        </section>
       </div>
     </div>
   );

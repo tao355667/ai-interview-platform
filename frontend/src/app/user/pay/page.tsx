@@ -1,12 +1,15 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { Button, Card, message, Spin, Tag, Typography } from 'antd';
+import { Button, message, Tag } from 'antd';
+import { Check, ShieldCheck } from 'lucide-react';
 import apiClient from '@/services/api/client';
 import { PAYMENT_API } from '@/config/api';
 import { useAuth } from '@/hooks/useAuth';
+import PageHeader from '@/components/common/PageHeader';
 
-const { Title, Text } = Typography;
+const CURRENCY_SYMBOLS: Record<string, string> = { usd: '$', cny: '¥' };
+const PROVIDER_LABELS: Record<string, string> = { paypal: 'PayPal' };
 
 export default function PayPage() {
   const { user, isAuthenticated } = useAuth();
@@ -16,7 +19,10 @@ export default function PayPage() {
     () => [
       {
         key: 'vip_monthly',
-        label: 'VIP Monthly (One-time)',
+        label: 'VIP 月卡',
+        description: '月度会员，一次性购买',
+        features: ['单次付款，不自动续费', '支持 PayPal 支付', '支付结果由后台自动校验'],
+        recommended: true,
         provider: 'paypal',
         product_code: 'monthly',
         price_code: 'monthly_9.99',
@@ -25,12 +31,12 @@ export default function PayPage() {
         product_name: 'VIP Monthly Pass',
       },
     ],
-    [],
+    []
   );
 
   const handleCreateCheckout = async (p: (typeof products)[number]) => {
     if (!isAuthenticated || !user) {
-      message.error('Please login first');
+      message.error('请先登录');
       return;
     }
 
@@ -55,7 +61,7 @@ export default function PayPage() {
 
       const res: any = await apiClient.post(PAYMENT_API.CHECKOUT_CREATE, req);
       if (!res?.checkout_url || !res?.order_no) {
-        throw new Error('Payment service returned incomplete data');
+        throw new Error('支付服务返回的数据不完整');
       }
 
       localStorage.setItem('payment_last_order_no', String(res.order_no));
@@ -64,53 +70,72 @@ export default function PayPage() {
       // 跳转到 PayPal approve 页面
       window.location.href = res.checkout_url;
     } catch (e: any) {
-      message.error(e?.response?.data?.message || e?.message || 'Payment initiation failed');
+      message.error(e?.response?.data?.message || e?.message || '发起支付失败，请稍后重试');
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 py-10">
-      <div className="container mx-auto px-4">
-        <Title level={2} className="text-slate-900 mb-2">
-          Payment Center
-        </Title>
-        <Text className="text-slate-500">Select a plan and complete payment via PayPal.</Text>
+    <div className="page py-10">
+      <PageHeader title="支付中心" description="选择套餐后将跳转到 PayPal 完成支付。" />
 
-        <div className="mt-8 grid grid-cols-1 md:grid-cols-2 gap-6">
-          {products.map((p) => (
-            <Card key={p.key} className="rounded-3xl shadow-lg border border-slate-100" hoverable>
-              <div className="flex items-start justify-between gap-4">
-                <div>
-                  <div className="flex items-center gap-2">
-                    <Text className="text-lg font-bold text-slate-900">{p.label}</Text>
-                    <Tag color="blue">{p.provider.toUpperCase()}</Tag>
-                  </div>
-                  <div className="mt-2 text-sm text-slate-500">
-                    Amount: {(p.amount / 100).toFixed(2)} {p.currency.toUpperCase()}
-                  </div>
-                </div>
-                <div className="text-right">
-                  <Button
-                    type="primary"
-                    className="bg-blue-600 hover:bg-blue-500 rounded-xl"
-                    onClick={() => handleCreateCheckout(p)}
-                    disabled={loading}
-                  >
-                    {loading ? <Spin size="small" /> : 'Pay Now'}
-                  </Button>
-                </div>
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
+        {products.map((p) => (
+          <div
+            key={p.key}
+            className={`surface-interactive flex flex-col p-6 ${p.recommended ? 'border-brand-600 hover:border-brand-600' : ''}`}
+          >
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <h2 className="text-lg font-semibold text-ink">{p.label}</h2>
+                <p className="mt-1 text-sm text-ink-secondary">{p.description}</p>
               </div>
-            </Card>
-          ))}
-        </div>
+              {p.recommended && (
+                <Tag bordered={false} className="m-0 shrink-0 bg-brand-50 text-brand-800">
+                  推荐
+                </Tag>
+              )}
+            </div>
 
-        <div className="mt-6 text-xs text-slate-400">
-          Note: Payment results are verified by backend webhook.
-        </div>
+            <div className="mt-5 flex items-baseline gap-1">
+              <span className="text-[32px] font-semibold leading-none text-ink tabular-nums">
+                {CURRENCY_SYMBOLS[p.currency] ?? ''}
+                {(p.amount / 100).toFixed(2)}
+              </span>
+              <span className="text-sm text-ink-secondary">{p.currency.toUpperCase()}</span>
+            </div>
+
+            <ul className="mt-5 space-y-2 text-sm text-ink-secondary">
+              {p.features.map((f) => (
+                <li key={f} className="flex items-center gap-2">
+                  <Check
+                    className="h-[1em] w-[1em] shrink-0 text-xs text-brand-600"
+                    aria-hidden="true"
+                  />
+                  {f}
+                </li>
+              ))}
+            </ul>
+
+            <Button
+              type="primary"
+              size="large"
+              block
+              className="mt-6"
+              onClick={() => handleCreateCheckout(p)}
+              loading={loading}
+            >
+              {loading ? '正在跳转…' : `使用 ${PROVIDER_LABELS[p.provider] ?? p.provider} 支付`}
+            </Button>
+          </div>
+        ))}
       </div>
+
+      <p className="mt-6 flex items-center gap-2 text-xs text-ink-secondary">
+        <ShieldCheck className="h-[1em] w-[1em] shrink-0" aria-hidden="true" />
+        支付结果以后台 webhook 校验为准，支付完成后会自动返回本站。
+      </p>
     </div>
   );
 }
-

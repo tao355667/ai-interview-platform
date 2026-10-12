@@ -1,42 +1,59 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import {
-  Typography,
-  Row,
-  Col,
-  Card as AntCard,
-  Select,
-  Empty,
-  Button,
-  Tag,
-  message,
-  Pagination,
-  Spin,
-} from 'antd';
-import { ReloadOutlined, SmileOutlined } from '@ant-design/icons';
+import { Select, Empty, Button, message, Pagination, Skeleton } from 'antd';
+import { RotateCw } from 'lucide-react';
+import { useRouter } from 'next/navigation';
 
 import Link from 'next/link';
 import apiClient from '@/services/api/client';
 import { INTERVIEW_API } from '@/config/api';
-
-const { Title } = Typography;
+import PageHeader from '@/components/common/PageHeader';
+import InterviewTypeTag from '@/components/records/InterviewTypeTag';
+import StatusTag from '@/components/records/StatusTag';
+import {
+  difficultyLabel,
+  domainLabel,
+  formatDateTime,
+  resolveInterviewType,
+  scoreLevel,
+  SCORE_TEXT_CLASS,
+} from '@/components/records/recordMeta';
 
 const QUOTES = [
-  'Interviewing is a two-way street. Stay confident and show your best self.',
-  'Every interview is a chance to grow, regardless of the outcome.',
-  'Trust your preparation — you are better than you think.',
-  'Stay calm. The best opportunities often come when you least expect them.',
-  'Failure is temporary. Keep going, success is just around the corner.',
-  'Prepare well, stay positive — you\'ve got this!',
-  'Behind every offer are countless efforts and attempts.',
-  'Interviewers are future colleagues too. Chat like friends.',
-  'Hard work never betrays those who persevere.',
-  'Stay calm and composed — your potential is limitless.',
+  '面试是双向选择，保持自信，展示最好的自己。',
+  '每一次面试都是成长的机会，无论结果如何。',
+  '相信你的准备，你比自己想象的更好。',
+  '保持冷静，好机会往往在不经意间出现。',
+  '失败只是暂时的，坚持下去，成功就在前方。',
+  '充分准备，保持积极，你一定可以。',
+  '每一个 offer 的背后，都是无数次的努力和尝试。',
+  '面试官也是未来的同事，像朋友一样交流。',
+  '努力不会辜负坚持的人。',
+  '沉着冷静，你的潜力超乎想象。',
 ];
 
+const FILTER_OPTIONS = [
+  { value: 'all', label: '全部类型' },
+  { value: 'comprehensive', label: '简历面试' },
+  { value: 'experienced', label: '社招简历面试' },
+  { value: 'campus', label: '校招简历面试' },
+];
+
+function recordTitle(it: any): string {
+  const meta = resolveInterviewType(it.type, it.domain);
+  if (it.companyName) {
+    const role = it.title || it.positionName;
+    return role ? `${it.companyName} · ${role}` : it.companyName;
+  }
+  if (it.title) return it.title;
+  if (it.positionName) return it.positionName;
+  if (meta?.kind === 'special' && it.domain) return `${domainLabel(it.domain)} 专项面试`;
+  return meta?.label || '未命名面试';
+}
+
 export default function InterviewRecordsPage() {
-  
+  const router = useRouter();
   const [quote, setQuote] = useState('');
   const [filter, setFilter] = useState('all');
 
@@ -70,19 +87,19 @@ export default function InterviewRecordsPage() {
         difficulty: it.difficulty,
         domain: it.domain,
         companyName: it.company_name,
+        positionName: it.position_name,
+        score: it.score,
         status: it.status,
         createdAt: it.created_at,
         updatedAt: it.updated_at,
       }));
       setList(items);
     } catch (e: any) {
-      message.error(e?.response?.data?.message || 'Load failed');
+      message.error(e?.response?.data?.message || '面试记录加载失败，请稍后重试');
     } finally {
       setLoading(false);
     }
   };
-
-  // 移除 mock 接口调用，改用真实接口
 
   useEffect(() => {
     fetchList();
@@ -129,264 +146,159 @@ export default function InterviewRecordsPage() {
   };
 
   return (
-    <div className="min-h-screen relative font-sans">
-      {/* Decorative Background */}
-      <div className="fixed top-0 right-0 w-[600px] h-[600px] bg-indigo-50/60 rounded-full blur-[120px] -translate-y-1/2 translate-x-1/3 pointer-events-none z-0" />
-      <div className="fixed bottom-0 left-0 w-[600px] h-[600px] bg-blue-50/60 rounded-full blur-[120px] translate-y-1/2 -translate-x-1/3 pointer-events-none z-0" />
+    <div className="page py-10">
+      <PageHeader
+        title="面试记录"
+        description="查看历史面试、评估报告与详细反馈"
+        actions={
+          <Button type="primary" onClick={() => router.push('/interview/social')}>
+            开始面试
+          </Button>
+        }
+      />
 
-      <div className="container mx-auto px-4 relative z-10">
-        <div className="mb-8 animate-fade-in-up">
-          <h1 className="text-3xl font-extrabold text-slate-900 tracking-tight">{"Interview Records"}</h1>
-          <p className="text-slate-500 mt-2">{"View your history, evaluation reports and feedback"}</p>
-        </div>
-
-        <AntCard
-          className="rounded-3xl border border-slate-100 shadow-xl shadow-slate-200/50 animate-fade-in-up overflow-hidden mb-8"
-          styles={{ body: { padding: 0 } }}
-          style={{ animationDelay: '0.1s' }}
-        >
-          <div className="bg-gradient-to-r from-blue-50/50 to-indigo-50/50 p-8">
-            <Row gutter={[24, 24]} align="middle">
-              <Col xs={24} md={10}>
-                <div className="bg-white/80 backdrop-blur-sm rounded-2xl p-6 shadow-sm border border-slate-100">
-                  <div className="grid grid-cols-2 gap-6 items-center">
-                    <div className="text-center border-r border-slate-100">
-                      <div className="text-4xl font-extrabold text-slate-800 mb-1">
-                        {totalCount}
-                      </div>
-                      <div className="text-sm text-slate-500 font-medium">{"Total Interviews"}</div>
-                    </div>
-                    <div className="text-center">
-                      <div className="text-4xl font-extrabold text-blue-600 mb-1">
-                        {completedCount}
-                      </div>
-                      <div className="text-sm text-slate-500 font-medium">{"Completed"}</div>
-                    </div>
-                  </div>
-                </div>
-              </Col>
-              <Col xs={24} md={14} className="flex">
-                <div className="w-full bg-white/60 backdrop-blur-sm rounded-2xl p-6 shadow-sm border border-slate-100 relative overflow-hidden group flex flex-col justify-center">
-                  <div className="absolute top-4 right-4 opacity-0 group-hover:opacity-100 transition-opacity z-10">
-                    <Button
-                      type="text"
-                      icon={<ReloadOutlined />}
-                      onClick={refreshQuote}
-                      className="text-slate-400 hover:text-blue-600 bg-white/50 hover:bg-white rounded-full"
-                      title="New quote"
-                    />
-                  </div>
-                  <div className="flex items-start gap-5">
-                    <div className="bg-gradient-to-br from-blue-100 to-indigo-100 p-4 rounded-full text-blue-600 shrink-0 shadow-inner">
-                      <SmileOutlined className="text-2xl" />
-                    </div>
-                    <div className="flex-1 pt-1">
-                      <h3 className="text-lg font-bold text-slate-800 mb-2 flex items-center gap-2">
-                        {"Daily Quote"}
-                        <span className="text-xs font-normal text-slate-400 bg-slate-100 px-2 py-0.5 rounded-full">
-                          {"Motivation"}
-                        </span>
-                      </h3>
-                      <p className="text-slate-600 text-base leading-relaxed italic relative">
-                        <span className="text-3xl text-slate-300 absolute -top-2 -left-2 font-serif">
-                          &quot;
-                        </span>
-                        <span className="relative z-10 pl-4">{quote}</span>
-                        <span className="text-3xl text-slate-300 absolute -bottom-4 -right-2 font-serif">
-                          &quot;
-                        </span>
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              </Col>
-            </Row>
-          </div>
-        </AntCard>
-
-        <div className="animate-fade-in-up" style={{ animationDelay: '0.2s' }}>
-          <div className="flex items-center justify-between mb-6 bg-white p-4 rounded-2xl border border-slate-100 shadow-sm">
-            <div className="flex items-center gap-4">
-              <span className="text-slate-600 font-medium">{"Filter Records:"}</span>
-              <Select
-                value={filter}
-                onChange={setFilter}
-                style={{ width: 180 }}
-                options={[
-                  { value: 'all', label: "All Types" },
-                  { value: 'comprehensive', label: "Comprehensive" },
-                  { value: 'experienced', label: "Experienced" },
-                  { value: 'campus', label: "Campus" },
-                ]}
-                className="font-medium"
-                size="large"
-                variant="filled"
-              />
+      {/* 概览 + 筛选 */}
+      <div className="surface mb-4 flex flex-col gap-4 p-4 sm:p-5 lg:flex-row lg:items-center lg:justify-between">
+        <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-center sm:gap-8">
+          <dl className="flex shrink-0 items-center gap-8">
+            <div>
+              <dt className="text-xs text-ink-secondary">面试总数</dt>
+              <dd className="mt-0.5 text-2xl font-semibold tabular-nums text-ink">
+                {loading ? '–' : totalCount}
+              </dd>
             </div>
+            <div>
+              <dt className="text-xs text-ink-secondary">已完成</dt>
+              <dd className="mt-0.5 text-2xl font-semibold tabular-nums text-brand-800">
+                {loading ? '–' : completedCount}
+              </dd>
+            </div>
+          </dl>
+          <div className="flex min-w-0 items-center gap-1 border-line text-sm text-ink-secondary sm:border-l sm:pl-8">
+            <span className="min-w-0">{quote}</span>
+            <Button
+              type="text"
+              size="small"
+              icon={<RotateCw className="h-4 w-4" aria-hidden="true" />}
+              onClick={refreshQuote}
+              aria-label="换一句"
+              title="换一句"
+            />
           </div>
-
-          <div className="mt-4">
-            <Spin spinning={loading}>
-              {filteredList.length === 0 ? (
-                <Empty
-                  imageStyle={{ height: 160 }}
-                  description={
-                    <div className="flex flex-col items-center">
-                      <div className="text-slate-500 text-lg mb-4">{"No related interview records found"}</div>
-                      <div className="flex gap-4">
-                        <Link href="/interview/social">
-                          <Button
-                            type="primary"
-                            className="bg-blue-600 h-10 px-6 rounded-full shadow-blue-200"
-                          >
-                            {"Experienced Interview"}
-                          </Button>
-                        </Link>
-                        <Link href="/interview/campus">
-                          <Button className="h-10 px-6 rounded-full border-slate-200 text-slate-600">
-                            {"Campus Interview"}
-                          </Button>
-                        </Link>
-                      </div>
-                    </div>
-                  }
-                  className="bg-white rounded-3xl p-12 border border-slate-100 shadow-sm"
-                />
-              ) : (
-                <>
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    {paginatedList.map((it: any) => {
-                      const statusMap: Record<
-                        string,
-                        { text: string; color: string; bg: string; border: string }
-                      > = {
-                        pending: {
-                          text: "Pending",
-                          color: 'text-blue-600',
-                          bg: 'bg-blue-50',
-                          border: 'border-blue-100',
-                        },
-                        in_progress: {
-                          text: "In Progress",
-                          color: 'text-orange-600',
-                          bg: 'bg-orange-50',
-                          border: 'border-orange-100',
-                        },
-                        completed: {
-                          text: "Completed",
-                          color: 'text-green-600',
-                          bg: 'bg-green-50',
-                          border: 'border-green-100',
-                        },
-                        aborted: {
-                          text: "Interrupted",
-                          color: 'text-slate-600',
-                          bg: 'bg-slate-100',
-                          border: 'border-slate-200',
-                        },
-                        failed: {
-                          text: "Abnormal Exit",
-                          color: 'text-red-600',
-                          bg: 'bg-red-50',
-                          border: 'border-red-100',
-                        },
-                      };
-                      const statusInfo = statusMap[it.status] || {
-                        text: it.status,
-                        color: 'text-slate-600',
-                        bg: 'bg-slate-50',
-                        border: 'border-slate-100',
-                      };
-                      const createdTime = it.createdAt
-                        ? new Date(it.createdAt).toLocaleString('en-US')
-                        : '-';
-
-                      return (
-                        <div
-                          key={it.id}
-                          className="group bg-white rounded-2xl p-6 border border-slate-100 shadow-lg shadow-slate-100/50 hover:shadow-xl hover:shadow-blue-100/50 hover:-translate-y-1 transition-all duration-300 relative overflow-hidden"
-                        >
-                          <div
-                            className={`absolute top-0 right-0 w-24 h-24 ${statusInfo.bg} rounded-bl-full -mr-8 -mt-8 opacity-50`}
-                          />
-
-                          <div className="relative z-10">
-                            <div className="flex justify-between items-start mb-4">
-                              <div
-                                className={`px-3 py-1 rounded-full text-xs font-bold ${statusInfo.bg} ${statusInfo.color} ${statusInfo.border} border`}
-                              >
-                                {statusInfo.text}
-                              </div>
-                              <div className="text-xs text-slate-400 font-mono">
-                                {createdTime.split(" ")[0]}
-                              </div>
-                            </div>
-
-                            <h3
-                              className="text-lg font-bold text-slate-800 mb-2 line-clamp-1"
-                              title={it.title || it.companyName}
-                            >
-                              {it.type === 'specialized interview' && !it.companyName
-                                ? it.title
-                                : `${it.companyName || 'Unnamed Company'}${it.title ? ` - ${it.title}` : ''}`}
-                            </h3>
-
-                            <div className="space-y-2 mb-6">
-                              <div className="flex items-center justify-between text-sm">
-                                <span className="text-slate-500">{"Interview Type"}</span>
-                                <span className="font-medium text-slate-700">{it.type || '-'}</span>
-                              </div>
-                              <div className="flex items-center justify-between text-sm">
-                                <span className="text-slate-500">{"Domain/Direction"}</span>
-                                <span className="font-medium text-slate-700">
-                                  {it.domain || '-'}
-                                </span>
-                              </div>
-                              <div className="flex items-center justify-between text-sm">
-                                <span className="text-slate-500">{"Difficulty"}</span>
-                                <span className="font-medium text-slate-700">
-                                  {it.difficulty || '-'}
-                                </span>
-                              </div>
-                            </div>
-
-                            <Link href={`/user/interviews/results/${it.id}`} className="block">
-                              <Button
-                                type="primary"
-                                ghost
-                                className="w-full h-10 rounded-xl border-blue-200 text-blue-600 hover:bg-blue-50 hover:border-blue-300 font-medium"
-                              >
-                                {"View Details & Feedback"}
-                              </Button>
-                            </Link>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-
-                  {/* 分页组件 */}
-                  {filteredList.length > pageSize && (
-                    <div className="flex justify-center mt-10">
-                      <Pagination
-                        current={currentPage}
-                        total={filteredList.length}
-                        pageSize={pageSize}
-                        onChange={handlePageChange}
-                        showSizeChanger={false}
-                        showTotal={(total) => (
-                          <span className="text-slate-500">Total {total} records</span>
-                        )}
-                        className="bg-white px-4 py-2 rounded-full shadow-sm border border-slate-100"
-                      />
-                    </div>
-                  )}
-                </>
-              )}
-            </Spin>
-          </div>
+        </div>
+        <div className="flex shrink-0 items-center gap-3">
+          <label htmlFor="record-filter" className="text-sm text-ink-secondary">
+            类型
+          </label>
+          <Select
+            id="record-filter"
+            value={filter}
+            onChange={setFilter}
+            style={{ width: 160 }}
+            options={FILTER_OPTIONS}
+          />
         </div>
       </div>
+
+      {loading ? (
+        <div className="space-y-3">
+          {Array.from({ length: 3 }).map((_, i) => (
+            <div key={i} className="surface p-5">
+              <Skeleton active title={{ width: '40%' }} paragraph={{ rows: 1, width: '70%' }} />
+            </div>
+          ))}
+        </div>
+      ) : filteredList.length === 0 ? (
+        <div className="surface px-6 py-12">
+          <Empty
+            description={
+              <span className="text-ink-secondary">
+                {list.length === 0
+                  ? '还没有面试记录，完成一场模拟面试后会在这里看到评估报告'
+                  : '没有符合筛选条件的面试记录'}
+              </span>
+            }
+          >
+            <Button type="primary" onClick={() => router.push('/interview/social')}>
+              开始面试
+            </Button>
+          </Empty>
+        </div>
+      ) : (
+        <>
+          <ul className="space-y-3">
+            {paginatedList.map((it: any) => {
+              const meta = resolveInterviewType(it.type, it.domain);
+              const createdTime = formatDateTime(it.createdAt);
+              const metaParts = [
+                meta ? null : domainLabel(it.domain),
+                difficultyLabel(it.difficulty),
+              ].filter(Boolean);
+              const score = typeof it.score === 'number' ? it.score : Number(it.score);
+              const hasScore = it.score != null && it.score !== '' && Number.isFinite(score);
+              const title = recordTitle(it);
+
+              return (
+                <li
+                  key={it.id}
+                  className="surface-interactive flex flex-col gap-4 p-4 sm:flex-row sm:items-center sm:gap-6 sm:p-5"
+                >
+                  <div className="min-w-0 flex-1">
+                    <div className="mb-1.5 flex flex-wrap items-center gap-2">
+                      <InterviewTypeTag type={it.type} domain={it.domain} />
+                      <StatusTag status={it.status} />
+                    </div>
+                    <h3 className="truncate text-base font-medium text-ink" title={title}>
+                      {title}
+                    </h3>
+                    <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-ink-secondary">
+                      {createdTime && <span className="tabular-nums">{createdTime}</span>}
+                      {metaParts.map((p) => (
+                        <span key={p as string}>{p}</span>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-between gap-6 sm:justify-end">
+                    <div className="w-16 text-left sm:text-right">
+                      <div className="text-xs text-ink-secondary">得分</div>
+                      {hasScore ? (
+                        <div
+                          className={`text-xl font-semibold tabular-nums ${SCORE_TEXT_CLASS[scoreLevel(score)]}`}
+                        >
+                          {score}
+                        </div>
+                      ) : (
+                        <div className="text-xl font-semibold text-ink-muted">–</div>
+                      )}
+                    </div>
+                    <Link
+                      href={`/user/interviews/results/${it.id}`}
+                      className="inline-flex h-9 shrink-0 items-center rounded border border-line-strong bg-white px-4 text-sm font-medium text-ink transition-colors duration-150 hover:border-brand-600 hover:text-brand-800"
+                    >
+                      查看报告
+                    </Link>
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+
+          {/* 分页组件 */}
+          {filteredList.length > pageSize && (
+            <div className="mt-6 flex justify-center">
+              <Pagination
+                current={currentPage}
+                total={filteredList.length}
+                pageSize={pageSize}
+                onChange={handlePageChange}
+                showSizeChanger={false}
+                showTotal={(total) => <span className="text-ink-secondary">共 {total} 条记录</span>}
+              />
+            </div>
+          )}
+        </>
+      )}
     </div>
   );
 }

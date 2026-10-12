@@ -1,13 +1,43 @@
 'use client';
 
-import { useMemo, useState, useEffect } from 'react';
-import { Typography, Row, Col, Card as AntCard, List, Tag, Space, Spin, message } from 'antd';
-import { BookOutlined, BulbOutlined, CheckCircleOutlined, StarOutlined } from '@ant-design/icons';
+import { useMemo, useState, useEffect, type ReactNode } from 'react';
+import Link from 'next/link';
+import { Button, Empty, Skeleton, message } from 'antd';
+import {
+  ArrowLeft,
+  Book,
+  ChevronLeft,
+  ChevronRight,
+  CircleCheck,
+  Lightbulb,
+  Star,
+} from 'lucide-react';
 import { useParams } from 'next/navigation';
 import { predictionService } from '@/services/api/prediction';
 import { PredictionQuestion } from '@/types/prediction';
+import PageHeader from '@/components/common/PageHeader';
 
-const { Title, Paragraph, Text } = Typography;
+const pad = (n: number) => String(n).padStart(2, '0');
+
+function Section({
+  icon,
+  title,
+  children,
+}: {
+  icon: ReactNode;
+  title: string;
+  children: ReactNode;
+}) {
+  return (
+    <section>
+      <h3 className="mb-3 flex items-center gap-2 text-base font-semibold text-ink">
+        <span className="text-brand-600">{icon}</span>
+        {title}
+      </h3>
+      {children}
+    </section>
+  );
+}
 
 export default function PressDetailPage() {
   const params = useParams();
@@ -35,10 +65,7 @@ export default function PressDetailPage() {
     fetchDetail();
   }, [id]);
 
-  const current = useMemo(
-    () => questions[selected] || null,
-    [questions, selected]
-  );
+  const current = useMemo(() => questions[selected] || null, [questions, selected]);
 
   const parsedFollowUps = useMemo(() => {
     if (!current?.follow_up) return [];
@@ -51,176 +78,159 @@ export default function PressDetailPage() {
     }
   }, [current]);
 
+  const backLink = (
+    <Link
+      href="/user/press"
+      className="inline-flex items-center gap-1 text-ink-secondary hover:text-brand-800"
+    >
+      <ArrowLeft className="h-[1em] w-[1em] shrink-0" aria-hidden="true" />
+      返回押题记录
+    </Link>
+  );
+
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <Spin size="large" tip="loading..." />
+      <div className="page py-10">
+        <PageHeader title="押题详情" extra={backLink} />
+        <div className="grid grid-cols-1 gap-6 md:grid-cols-12">
+          <div className="surface p-4 md:col-span-4 lg:col-span-3">
+            <Skeleton active title={false} paragraph={{ rows: 8 }} />
+          </div>
+          <div className="surface p-6 md:col-span-8 lg:col-span-9">
+            <Skeleton active paragraph={{ rows: 10 }} />
+          </div>
+        </div>
       </div>
     );
   }
 
   if (!current) {
     return (
-      <div className="min-h-screen flex items-center justify-center text-slate-500">
-        No relevant records found
+      <div className="page py-10">
+        <PageHeader title="押题详情" extra={backLink} />
+        <div className="surface py-12">
+          <Empty description="没有找到这份押题的内容">
+            <Link href="/resume">
+              <Button type="primary">去押题</Button>
+            </Link>
+          </Empty>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen relative font-sans">
-      {/* Decorative Background */}
-      <div className="fixed top-0 right-0 w-[600px] h-[600px] bg-green-50/60 rounded-full blur-[120px] -translate-y-1/2 translate-x-1/3 pointer-events-none z-0" />
-      <div className="fixed bottom-0 left-0 w-[600px] h-[600px] bg-blue-50/60 rounded-full blur-[120px] translate-y-1/2 -translate-x-1/3 pointer-events-none z-0" />
+    <div className="page py-10">
+      <PageHeader
+        title="押题详情"
+        description={
+          <>
+            共 <span className="tabular-nums">{questions.length}</span>{' '}
+            道题，包含考察重点、答题思路和参考答案
+          </>
+        }
+        extra={backLink}
+      />
 
-      <div className="container mx-auto px-4 relative z-10 pb-12">
-        <div className="mb-8 animate-fade-in-up">
-          <h1 className="text-3xl font-extrabold text-slate-900 tracking-tight flex items-center gap-3">
-            <BookOutlined className="text-blue-600" />
-            Resume Prediction Details
-          </h1>
-          <p className="text-slate-500 mt-2 ml-11">Check out the precise interview questions and detailed explanations generated for you</p>
-        </div>
+      <div className="grid grid-cols-1 gap-6 md:grid-cols-12">
+        {/* 题目列表 */}
+        <aside className="surface overflow-hidden md:col-span-4 md:self-start lg:col-span-3">
+          <div className="border-b border-line px-4 py-3 text-sm font-medium text-ink">
+            题目列表
+          </div>
+          <ol className="max-h-[calc(100vh-240px)] overflow-y-auto py-1">
+            {questions.map((item, index) => {
+              const active = index === selected;
+              return (
+                <li key={item.id ?? index}>
+                  <button
+                    type="button"
+                    onClick={() => setSelected(index)}
+                    aria-current={active ? 'true' : undefined}
+                    className={`flex w-full gap-2 border-l-2 px-4 py-2.5 text-left text-sm transition-colors duration-150 ${
+                      active
+                        ? 'border-brand-600 bg-brand-50 text-brand-800'
+                        : 'border-transparent text-ink hover:bg-canvas'
+                    }`}
+                  >
+                    <span
+                      className={`shrink-0 tabular-nums ${active ? 'text-brand-800' : 'text-ink-secondary'}`}
+                    >
+                      {pad(index + 1)}
+                    </span>
+                    <span className="line-clamp-2">{item.question}</span>
+                  </button>
+                </li>
+              );
+            })}
+          </ol>
+        </aside>
 
-        <Row
-          gutter={[24, 24]}
-          className="mt-2 animate-fade-in-up"
-          style={{ animationDelay: '0.1s' }}
-        >
-          <Col xs={24} md={7} lg={6}>
-            <AntCard
-              className="rounded-2xl border-slate-100 shadow-lg shadow-slate-200/50 h-full"
-              styles={{ body: { padding: 0 } }}
+        {/* 题目详情 */}
+        <article className="surface p-6 md:col-span-8 lg:col-span-9">
+          <div className="flex gap-3">
+            <span className="shrink-0 text-xl font-semibold tabular-nums text-brand-800">
+              {pad(selected + 1)}
+            </span>
+            <h2 className="text-xl font-semibold leading-8 text-ink">{current.question}</h2>
+          </div>
+
+          <div className="mt-6 space-y-8 border-t border-line pt-6">
+            <Section icon={<Star className="h-4 w-4" aria-hidden="true" />} title="考察重点">
+              <div className="rounded-lg bg-brand-50 px-4 py-3 text-[15px] leading-7 text-ink">
+                {current.focus}
+              </div>
+            </Section>
+
+            <Section icon={<CircleCheck className="h-4 w-4" aria-hidden="true" />} title="答题思路">
+              <div className="whitespace-pre-wrap text-[15px] leading-7 text-ink">
+                {current.thinking_path}
+              </div>
+            </Section>
+
+            <Section icon={<Book className="h-4 w-4" aria-hidden="true" />} title="参考答案">
+              <div className="whitespace-pre-wrap rounded-lg border border-line bg-canvas px-4 py-3 text-[15px] leading-7 text-ink">
+                {current.reference_answer}
+              </div>
+            </Section>
+
+            {parsedFollowUps.length > 0 && (
+              <Section
+                icon={<Lightbulb className="h-4 w-4" aria-hidden="true" />}
+                title="可能的追问"
+              >
+                <ol className="divide-y divide-line rounded-lg border border-line">
+                  {parsedFollowUps.map((t: any, i: number) => (
+                    <li key={i} className="flex gap-3 px-4 py-3 text-[15px] leading-7 text-ink">
+                      <span className="shrink-0 tabular-nums text-brand-800">{pad(i + 1)}</span>
+                      <span>{t}</span>
+                    </li>
+                  ))}
+                </ol>
+              </Section>
+            )}
+          </div>
+
+          <div className="mt-8 flex items-center justify-between border-t border-line pt-4">
+            <Button
+              icon={<ChevronLeft className="h-4 w-4" aria-hidden="true" />}
+              disabled={selected === 0}
+              onClick={() => setSelected((s) => Math.max(0, s - 1))}
             >
-              <div className="p-5 border-b border-slate-100 bg-slate-50/50 rounded-t-2xl">
-                <Space align="center" className="font-bold text-slate-700">
-                  <BookOutlined className="text-blue-500" />
-                  <span>Question List</span>
-                </Space>
-              </div>
-              <div className="max-h-[calc(100vh-300px)] overflow-y-auto custom-scrollbar">
-                <List
-                  itemLayout="horizontal"
-                  dataSource={questions}
-                  split={false}
-                  renderItem={(item, index) => (
-                    <List.Item
-                      onClick={() => setSelected(index)}
-                      className={`transition-colors duration-200 cursor-pointer border-l-4 px-4 py-3 hover:bg-blue-50/50 ${
-                        index === selected ? 'bg-blue-50 border-blue-500' : 'border-transparent'
-                      }`}
-                    >
-                      <div className="w-full">
-                        <div
-                          className={`font-medium mb-1 line-clamp-2 ${index === selected ? 'text-blue-700' : 'text-slate-700'}`}
-                        >
-                          <span className="mr-2 text-slate-400">0{index + 1}.</span>
-                          {item.question}
-                        </div>
-                      </div>
-                    </List.Item>
-                  )}
-                />
-              </div>
-            </AntCard>
-          </Col>
-          <Col xs={24} md={17} lg={18}>
-            <AntCard
-              className="rounded-2xl border-slate-100 shadow-lg shadow-slate-200/50 min-h-[600px]"
-              styles={{ body: { padding: 32 } }}
+              上一题
+            </Button>
+            <span className="text-sm tabular-nums text-ink-secondary">
+              {selected + 1} / {questions.length}
+            </span>
+            <Button
+              disabled={selected >= questions.length - 1}
+              onClick={() => setSelected((s) => Math.min(questions.length - 1, s + 1))}
             >
-              <div className="flex flex-col gap-6">
-                <div className="flex flex-col md:flex-row md:items-start justify-between gap-4">
-                  <h2 className="text-xl font-bold text-slate-800 leading-relaxed flex-1">
-                    <span className="text-blue-600 mr-2 text-2xl">Q{selected + 1}.</span>
-                    {current.question}
-                  </h2>
-                  <Space wrap>
-                    <Tag
-                      color="blue"
-                      className="px-3 py-1 rounded-full border-0 bg-blue-50 text-blue-600 font-medium"
-                    >
-                      Overall Thinking
-                    </Tag>
-                    <Tag
-                      color="green"
-                      className="px-3 py-1 rounded-full border-0 bg-green-50 text-green-600 font-medium"
-                    >
-                      Reference Answer
-                    </Tag>
-                    {/* <Tag className="px-3 py-1 rounded-full border-slate-200 text-slate-500 hover:text-blue-600 cursor-pointer transition-colors">
-                      收藏单题
-                    </Tag> */}
-                  </Space>
-                </div>
-
-                <div className="w-full h-px bg-slate-100" />
-
-                <div className="space-y-8">
-                  {/* Key Focus Section - New */}
-                  <section>
-                     <div className="flex items-center gap-2 mb-4 text-lg font-bold text-slate-800">
-                      <div className="w-8 h-8 rounded-lg bg-purple-100 flex items-center justify-center text-purple-600">
-                        <StarOutlined />
-                      </div>
-                      Key Focus
-                    </div>
-                     <div className="bg-purple-50/50 rounded-xl p-4 border border-purple-100 text-slate-700">
-                        {current.focus}
-                     </div>
-                  </section>
-
-                  <section>
-                    <div className="flex items-center gap-2 mb-4 text-lg font-bold text-slate-800">
-                      <div className="w-8 h-8 rounded-lg bg-green-100 flex items-center justify-center text-green-600">
-                        <CheckCircleOutlined />
-                      </div>
-                      Answer Thinking
-                    </div>
-                    {/* Changed from structured idea array to text block for thinking_path */}
-                     <div className="bg-slate-50 rounded-xl p-6 border border-slate-100 text-slate-700 leading-relaxed whitespace-pre-wrap">
-                        {current.thinking_path}
-                     </div>
-                  </section>
-
-                  <section>
-                    <div className="flex items-center gap-2 mb-4 text-lg font-bold text-slate-800">
-                      <div className="w-8 h-8 rounded-lg bg-indigo-100 flex items-center justify-center text-indigo-600">
-                        <BookOutlined />
-                      </div>
-                      Reference Answer
-                    </div>
-                    <div className="bg-gradient-to-br from-slate-50 to-white rounded-xl p-6 border border-slate-100 text-slate-700 leading-loose whitespace-pre-wrap">
-                      {current.reference_answer}
-                    </div>
-                  </section>
-
-                  <section>
-                    <div className="flex items-center gap-2 mb-4 text-lg font-bold text-slate-800">
-                      <div className="w-8 h-8 rounded-lg bg-orange-100 flex items-center justify-center text-orange-600">
-                        <BulbOutlined />
-                      </div>
-                      Possible Follow-up Questions
-                    </div>
-                    <div className="bg-white rounded-xl border border-slate-100 overflow-hidden">
-                      <List
-                        dataSource={parsedFollowUps}
-                        renderItem={(t, i) => (
-                          <List.Item className="px-6 py-4 hover:bg-slate-50 transition-colors border-slate-50">
-                            <div className="flex gap-3">
-                              <span className="text-orange-500 font-bold font-mono">0{i + 1}</span>
-                              <span className="text-slate-700">{t}</span>
-                            </div>
-                          </List.Item>
-                        )}
-                      />
-                    </div>
-                  </section>
-                </div>
-              </div>
-            </AntCard>
-          </Col>
-        </Row>
+              下一题
+              <ChevronRight className="h-4 w-4" aria-hidden="true" />
+            </Button>
+          </div>
+        </article>
       </div>
     </div>
   );

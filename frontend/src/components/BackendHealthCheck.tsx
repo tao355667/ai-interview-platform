@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { Button, Card, Descriptions, Tag, message } from 'antd';
-import { CheckCircleOutlined, CloseCircleOutlined, SyncOutlined } from '@ant-design/icons';
+import { CircleCheck, CircleX, RefreshCw } from 'lucide-react';
 import { INTERVIEW_API } from '@/config/api';
 
 interface HealthCheckResult {
@@ -60,9 +60,9 @@ export default function BackendHealthCheck() {
       setResult(checkResult);
 
       if (!checkResult.interviewEndpoint) {
-        message.warning('面试接口返回404，可能需要检查后端路由配置');
+        message.warning('面试接口返回 404，请检查后端路由配置');
       } else if (!checkResult.corsSupport) {
-        message.warning('后端CORS配置可能有问题');
+        message.warning('后端 CORS 配置可能有问题');
       } else {
         message.success('后端服务检查通过');
       }
@@ -79,11 +79,19 @@ export default function BackendHealthCheck() {
 
   const StatusTag = ({ status }: { status: boolean }) => {
     return status ? (
-      <Tag icon={<CheckCircleOutlined />} color="success">
+      <Tag
+        icon={
+          <CircleCheck className="mr-1 inline-block h-3 w-3 align-[-0.125em]" aria-hidden="true" />
+        }
+        color="success"
+      >
         正常
       </Tag>
     ) : (
-      <Tag icon={<CloseCircleOutlined />} color="error">
+      <Tag
+        icon={<CircleX className="mr-1 inline-block h-3 w-3 align-[-0.125em]" aria-hidden="true" />}
+        color="error"
+      >
         异常
       </Tag>
     );
@@ -92,53 +100,59 @@ export default function BackendHealthCheck() {
   return (
     <Card
       title="后端服务诊断"
+      className="rounded-card"
       extra={
-        <Button type="primary" icon={<SyncOutlined />} loading={checking} onClick={checkBackend}>
+        <Button
+          type="primary"
+          icon={<RefreshCw className="h-4 w-4" aria-hidden="true" />}
+          loading={checking}
+          onClick={checkBackend}
+        >
           检查后端服务
         </Button>
       }
     >
-      {!result && <p className="text-gray-500">点击"检查后端服务"按钮开始诊断</p>}
+      {!result && <p className="text-sm text-ink-secondary">点击“检查后端服务”开始诊断。</p>}
 
       {result && (
         <Descriptions column={1} bordered>
           <Descriptions.Item label="面试接口">
             <StatusTag status={result.interviewEndpoint} />
             {!result.interviewEndpoint && (
-              <div className="mt-2 text-orange-600">
-                <p>⚠️ 面试接口返回404，可能的原因：</p>
-                <ul className="list-disc ml-6 mt-1">
+              <div className="mt-2 text-sm text-warning">
+                <p>面试接口返回 404，可能的原因：</p>
+                <ul className="ml-5 mt-1 list-disc space-y-1">
                   <li>后端路由未正确注册</li>
                   <li>需要将 /api/mianshi/stream/start 添加到公共路由列表</li>
-                  <li>JWT中间件拦截了请求</li>
+                  <li>JWT 中间件拦截了请求</li>
                 </ul>
               </div>
             )}
           </Descriptions.Item>
 
-          <Descriptions.Item label="CORS支持">
+          <Descriptions.Item label="CORS 支持">
             <StatusTag status={result.corsSupport} />
             {!result.corsSupport && (
-              <span className="ml-2 text-orange-500">后端可能缺少CORS配置</span>
+              <span className="ml-2 text-sm text-warning">后端可能缺少 CORS 配置</span>
             )}
           </Descriptions.Item>
 
           {result.error && (
             <Descriptions.Item label="错误信息">
-              <span className="text-red-500">{result.error}</span>
+              <span className="text-danger">{result.error}</span>
             </Descriptions.Item>
           )}
         </Descriptions>
       )}
 
       {result && !result.interviewEndpoint && (
-        <div className="mt-4 p-4 bg-blue-50 rounded">
-          <p className="font-bold mb-2">💡 解决方案：</p>
-          <p>
+        <div className="mt-4 rounded-lg border border-accent-200 bg-accent-50 p-4 text-sm text-ink">
+          <p className="mb-2 font-medium">解决方案</p>
+          <p className="text-ink-secondary">
             请在后端的 <code>middleware.go</code> 文件中，将以下路径添加到{' '}
             <code>jwtPublicRoutes</code>：
           </p>
-          <pre className="mt-2 p-2 bg-white rounded border">
+          <pre className="mt-2 overflow-x-auto rounded-lg border border-line bg-white p-3 font-mono text-xs leading-5">
             {`"/api/mianshi/stream/start": {},
 "/api/mianshi/answer/submit": {},
 "/api/mianshi/interview/end": {},`}

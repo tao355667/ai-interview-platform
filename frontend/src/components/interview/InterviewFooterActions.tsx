@@ -1,4 +1,4 @@
-import { AudioOutlined, SendOutlined, StopOutlined } from '@ant-design/icons';
+import { ArrowUp, Mic } from 'lucide-react';
 import { Button } from 'antd';
 
 interface InterviewFooterActionsProps {
@@ -10,7 +10,8 @@ interface InterviewFooterActionsProps {
   sendDisabled: boolean;
   onMicClick: () => void;
   onSubmit: () => void;
-  sendButtonClassName: string;
+  /** 输入框下方的状态提示，例如语音识别状态 */
+  hint?: string;
   sendLabel?: string;
 }
 
@@ -23,45 +24,55 @@ export function InterviewFooterActions({
   sendDisabled,
   onMicClick,
   onSubmit,
-  sendButtonClassName,
-  sendLabel = 'Send',
+  hint,
+  sendLabel = '发送',
 }: InterviewFooterActionsProps) {
+  const recordingActive = isRecording || isStopping;
+
   return (
-    <div className="relative z-10 flex justify-between items-center px-2 pb-2 pt-1 border-t border-slate-50">
-      <div className="flex gap-1">
-        {isRecording || isStopping ? (
-          <Button
-            danger
-            shape="round"
-            size="small"
-            icon={<StopOutlined />}
-            disabled={isStopping}
-            onClick={onMicClick}
-            className="!h-9 !px-4 !font-medium"
-          >
-            {isStopping ? 'Stopping...' : 'Stop Rec.'}
+    <div className="flex items-center justify-between gap-3 border-t border-line px-3 py-2">
+      <div className="flex min-w-0 items-center gap-2">
+        {recordingActive ? (
+          <Button danger size="small" disabled={isStopping} onClick={onMicClick}>
+            <span className="inline-flex items-center gap-1.5">
+              <span className="h-2 w-2 rounded-full bg-danger animate-pulse" aria-hidden="true" />
+              {/* 录音中的实时声波 */}
+              {!isStopping && (
+                <span className="flex h-3.5 items-center gap-[2px]" aria-hidden="true">
+                  {[0, 1, 2, 3, 4].map((i) => (
+                    <span
+                      key={i}
+                      className="h-full w-[2px] origin-center animate-wave rounded-full bg-danger"
+                      style={{ animationDelay: `${i * 0.12}s` }}
+                    />
+                  ))}
+                </span>
+              )}
+              {isStopping ? '正在停止…' : '停止录音'}
+            </span>
           </Button>
         ) : (
           <Button
             type="text"
             size="small"
-            icon={<AudioOutlined className="text-slate-400" />}
+            aria-label="语音输入"
+            icon={<Mic className="h-4 w-4" aria-hidden="true" />}
             disabled={speechDisabled || asrLoading}
             onClick={onMicClick}
-            className="!text-slate-400 !w-9 !h-9"
           />
         )}
+        {hint && <span className="truncate text-xs text-ink-secondary">{hint}</span>}
       </div>
-      <div className="flex items-center gap-3">
-        <span className="text-xs text-slate-300 hidden sm:inline-block">Enter to Send</span>
+      <div className="flex shrink-0 items-center gap-3">
+        <span className="hidden text-xs text-ink-muted sm:inline">
+          Enter 发送 · Shift+Enter 换行
+        </span>
         <Button
           type="primary"
-          shape="round"
-          icon={<SendOutlined />}
+          icon={<ArrowUp className="h-4 w-4" aria-hidden="true" />}
           loading={submitting}
           disabled={sendDisabled}
           onClick={onSubmit}
-          className={sendButtonClassName}
         >
           {sendLabel}
         </Button>

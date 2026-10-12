@@ -1,0 +1,37 @@
+# Run the server from a temporary directory containing a copy named config.yaml.
+# Use a dedicated benchmark database; do not point this config at application data.
+host: '127.0.0.1'
+port: 18899
+database:
+  driver: 'mysql'
+  dsn: '${BENCH_MYSQL_DSN}'
+  max_open_conns: 100
+  max_idle_conns: 100
+  conn_max_lifetime: '1h'
+redis:
+  addr: '127.0.0.1:16379'
+  db: 0
+hertz:
+  read_timeout: '10s'
+  write_timeout: '10s'
+  idle_timeout: '60s'
+  keep_alive: true
+  rate_limit:
+    # Capacity test only: deliberately raise the business traffic limit.
+    rps: 1000000
+    burst: 1000000
+    use_redis: true
+    redis_key_prefix: 'bench:capacity:'
+security:
+  jwt_secret: 'bench-only-do-not-deploy'
+  jwt_expiration: '24h'
+llm:
+  api_key: '${LLM_API_KEY}'
+  base_url: '${LLM_BASE_URL}'
+  model_name: '${LLM_MODEL_NAME}'
+  provider_name: '${LLM_PROVIDER_NAME}'
+payment:
+  stripe: {}
+  paypal: {}
+feishu:
+  enabled: false

@@ -46,10 +46,11 @@ type InterviewState struct {
 	TopicTracker *topic.TopicTracker
 
 	// 当前轮次数据
-	QuestionIndex int
-	QuestionText  string
-	Answer        string
-	EvalResult    *evaluator.EvaluationResult
+	QuestionIndex       int
+	QuestionText        string
+	Answer              string
+	EvalResult          *evaluator.EvaluationResult
+	EvaluationAvailable bool
 
 	// 分支节点设置的下一题提示（由 deepen/continue/lower/switch 节点设置）
 	NextActionHint string // 下一题的 Prompt 提示
@@ -294,8 +295,8 @@ func waitAnswerNode(ctx context.Context, state *InterviewState) (*InterviewState
 	}
 
 	// 发送就绪事件
-	SendReadyEventWithSession(state.Writer, state.QuestionIndex, state.Session.SessionID)
 	state.SessionManager.ClearAnswer(state.Session.SessionID)
+	SendReadyEventWithSession(state.Writer, state.QuestionIndex, state.Session.SessionID)
 
 	// 等待用户回答
 	log.Printf("[Graph] Waiting for answer, question: %d/%d", state.QuestionIndex, state.MaxQuestions)
@@ -333,11 +334,13 @@ func evaluateNode(ctx context.Context, state *InterviewState) (*InterviewState, 
 		Answer:       state.Answer,
 	}, state.ScoreHistory)
 
+	state.EvaluationAvailable = err == nil
 	if err != nil {
 		log.Printf("[Graph] Evaluation failed: %v", err)
 		// 评分失败不影响主流程
 		state.EvalResult = &evaluator.EvaluationResult{
 			NextAction: evaluator.ActionContinue,
+			Reason:     "evaluation_unavailable",
 		}
 	} else {
 		state.EvalResult = result
@@ -366,7 +369,7 @@ func evaluateNode(ctx context.Context, state *InterviewState) (*InterviewState, 
 	}
 
 	// 更新会话计数
-	state.Session.QuestionCount = int32(state.QuestionIndex)
+	state.Session.SetQuestionCount(int32(state.QuestionIndex))
 
 	// 保存 dialogue 数据
 	err = saveDialogue(ctx, state.Session, dialogue)
@@ -376,10 +379,11 @@ func evaluateNode(ctx context.Context, state *InterviewState) (*InterviewState, 
 
 	// 发送进度
 	_ = SendSSEEvent(state.Writer, map[string]interface{}{
-		"type":     "answer_received",
-		"index":    state.QuestionIndex,
-		"total":    state.MaxQuestions,
-		"progress": float64(state.QuestionIndex) / float64(state.MaxQuestions) * 100,
+		"type":                 "answer_received",
+		"index":                state.QuestionIndex,
+		"total":                state.MaxQuestions,
+		"progress":             float64(state.QuestionIndex) / float64(state.MaxQuestions) * 100,
+		"evaluation_available": state.EvaluationAvailable,
 	})
 
 	return state, nil
@@ -649,7 +653,7 @@ func (e *InterviewEngine) RunInterviewLoopWithGraph(ctx context.Context, session
 					log.Printf("[Graph] Saved %d dialogue(s) after graph error, reportID: %d", len(dlg), session.RecordID)
 					session.MarkDialoguesPersisted()
 					endTime := time.Now()
-					session.LastActivity = endTime
+					session.Touch()
 					duration := int64(endTime.Sub(session.StartTime).Seconds())
 					st := "failed"
 					if stderrors.Is(err, context.Canceled) {
@@ -724,8 +728,7 @@ func (e *InterviewEngine) RunInterviewLoopWithGraph(ctx context.Context, session
 	}
 	session.MarkDialoguesPersisted()
 	endTime := time.Now()
-	session.LastActivity = endTime
-	session.Status = "completed"
+	session.SetStatus("completed", endTime)
 	duration := int64(endTime.Sub(session.StartTime).Seconds())
 	updateDTO := &interviewsapi.InterviewRecordDTO{
 		ID:       int64(session.RecordID),

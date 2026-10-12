@@ -576,14 +576,14 @@ func extractTokenFromURL(url string) string {
 	if url == "" {
 		return ""
 	}
-	// 处理 folder URL: https://awq7m8b63wy.feishu.cn/drive/folder/SGQ0fYKoRlOWi7dwri5clDGrnme
+	// 处理 folder URL: https://<tenant>.feishu.cn/drive/folder/<folder_token>
 	if strings.Contains(url, "/drive/folder/") {
 		parts := strings.Split(url, "/drive/folder/")
 		if len(parts) > 1 {
 			return strings.TrimSpace(parts[1])
 		}
 	}
-	// 处理 docx URL: https://awq7m8b63wy.feishu.cn/docx/GCnddftYuoVvflx5YFIc8m9mnpe
+	// 处理 docx URL: https://<tenant>.feishu.cn/docx/<doc_token>
 	if strings.Contains(url, "/docx/") {
 		parts := strings.Split(url, "/docx/")
 		if len(parts) > 1 {

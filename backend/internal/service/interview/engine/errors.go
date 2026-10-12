@@ -4,6 +4,7 @@ import "errors"
 
 var (
 	// ErrSessionNotFound 会话未找到
+	ErrAnswerPending   = errors.New("previous answer is still pending")
 	ErrSessionNotFound = errors.New("session not found")
 	// ErrInvalidSessionID 无效的会话ID
 	ErrInvalidSessionID = errors.New("invalid session id")

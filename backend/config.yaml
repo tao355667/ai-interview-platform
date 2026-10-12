@@ -7,7 +7,7 @@ database:
   driver: 'mysql'
   dsn: '${DB_USER}:${DB_PASSWORD}@tcp(${DB_HOST}:${DB_PORT})/${DB_NAME}?charset=utf8mb4&parseTime=True&loc=Local'
   max_open_conns: 100
-  max_idle_conns: 10
+  max_idle_conns: 100
   conn_max_lifetime: '1h'
 
 # Redis配置
@@ -163,9 +163,9 @@ payment:
     webhook_secret: '${STRIPE_WEBHOOK_SECRET}' # Stripe Webhook 签名密钥
     publishable_key: '${STRIPE_PUBLISHABLE_KEY}' # Stripe Publishable Key（前端使用）
   paypal:
-    client_id: 'YOUR_PAYPAL_CLIENT_ID_FROM_PAYPAL_DEVELOPER_DASHBOARD' # PayPal Client ID
-    client_secret: 'YOUR_PAYPAL_CLIENT_SECRET_FROM_PAYPAL_DEVELOPER_DASHBOARD' # PayPal Client Secret
-    webhook_id: '3YE693123Р282731M' # PayPal Webhook ID（用于验签）
+    client_id: '${PAYPAL_CLIENT_ID}' # PayPal Client ID，从环境变量读取
+    client_secret: '${PAYPAL_CLIENT_SECRET}' # PayPal Client Secret，从环境变量读取
+    webhook_id: '${PAYPAL_WEBHOOK_ID}' # PayPal Webhook ID（用于验签），从环境变量读取
     sandbox: true # true=沙箱环境, false=生产环境
   webhook_timeout: '5m' # Webhook 事件时间窗口（防重放）
   allowed_return_urls: # 支付成功/取消跳转 URL 白名单

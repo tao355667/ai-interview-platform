@@ -7,7 +7,7 @@ database:
   driver: 'mysql'
   dsn: 'root:root@tcp(localhost:3306)/interview_agent?charset=utf8mb4&parseTime=True&loc=Local'
   max_open_conns: 100
-  max_idle_conns: 10
+  max_idle_conns: 100
   conn_max_lifetime: '1h'
 
 # Redis配置

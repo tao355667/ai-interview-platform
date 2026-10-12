@@ -8,6 +8,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/redis/go-redis/v9"
 )
 
@@ -103,17 +104,23 @@ return {current + tokens, 1}
 // KEYS[1] = sorted set key (tpm key)
 // ARGV[1] = old member to remove
 // ARGV[2] = new member (with corrected token count in name)
-// ARGV[3] = timestamp score for new member
+// ARGV[3] = window start; retain the reservation timestamp
 //
 // Returns: 1 on success
 var tpmAdjustScript = redis.NewScript(`
 local key = KEYS[1]
 local old_member = ARGV[1]
 local new_member = ARGV[2]
-local score = tonumber(ARGV[3])
-
+local window_start = tonumber(ARGV[3])
+local score = redis.call('ZSCORE', key, old_member)
+-- A late or repeated response must not recreate an expired reservation or
+-- extend its original sliding-window lifetime. ZREM/ZADD preserves key TTL
+-- except when removing the last member, so restore the remaining TTL.
+if not score or tonumber(score) <= window_start then return 0 end
+local ttl = redis.call('PTTL', key)
 redis.call('ZREM', key, old_member)
 redis.call('ZADD', key, score, new_member)
+if ttl > 0 then redis.call('PEXPIRE', key, ttl) end
 
 return 1
 `)
@@ -219,15 +226,17 @@ type RedisRateLimiter struct {
 	client *redis.Client
 	config Config
 	mu     sync.RWMutex
-	// counter for generating unique member IDs within the same microsecond
-	counter uint64
+	// Each limiter instance owns a distinct namespace, including across processes.
+	instanceID string
+	counter    uint64
 }
 
 // NewRedisRateLimiter creates a new Redis-based rate limiter.
 func NewRedisRateLimiter(client *redis.Client, cfg Config) *RedisRateLimiter {
 	return &RedisRateLimiter{
-		client: client,
-		config: cfg,
+		client:     client,
+		config:     cfg,
+		instanceID: uuid.NewString(),
 	}
 }
 
@@ -279,7 +288,7 @@ func (r *RedisRateLimiter) generateMember(prefix string) string {
 	r.counter++
 	c := r.counter
 	r.mu.Unlock()
-	return fmt.Sprintf("%s-%d-%d", prefix, time.Now().UnixNano(), c)
+	return fmt.Sprintf("%s-%s-%d", prefix, r.instanceID, c)
 }
 
 func (r *RedisRateLimiter) handleDependencyError(operation string, err error) error {
@@ -416,11 +425,14 @@ func (r *RedisRateLimiter) AdjustTokens(ctx context.Context, apiKey, model strin
 	}
 
 	key := buildKey(apiKey, model, "tpm")
+	if actualTokens < 0 {
+		actualTokens = 0
+	}
 	newMember := tpmMemberWithTokens(preAllocMember, actualTokens)
 	now := time.Now().UnixMicro()
 
 	_, err := tpmAdjustScript.Run(ctx, r.client, []string{key},
-		preAllocMember, newMember, now,
+		preAllocMember, newMember, now-60*1e6,
 	).Result()
 
 	if err != nil {

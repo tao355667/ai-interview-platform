@@ -12,7 +12,7 @@ type (
 	}
 	InterviewRecord struct {
 		ID           uint64    `json:"id" gorm:"primaryKey;autoIncrement;comment:面试主表"`
-		UserID       uint      `json:"user_id" gorm:"index;not null;comment:用户ID"`
+		UserID       uint      `json:"user_id" gorm:"index;index:idx_interview_user_created,priority:1;not null;comment:用户ID"`
 		Type         string    `json:"type" gorm:"size:255;not null;comment:面试类型(综合面试、专项面试)"`
 		Difficulty   string    `json:"difficulty" gorm:"size:128;not null;comment:难度级别（简单、中等、困难）"`
 		Domain       string    `json:"domain" gorm:"size:255;not null;comment:面试领域(校招、社招；java、golang)"`
@@ -20,7 +20,7 @@ type (
 		PositionName string    `json:"position_name" gorm:"size:128;comment:岗位名称"`
 		Status       string    `json:"status" gorm:"size:50;not null;default:'pending';comment:面试状态（pending/completed）"`
 		Duration     int64     `json:"duration" gorm:"comment:面试耗时（秒）"`
-		CreatedAt    time.Time `json:"created_at" gorm:"autoCreateTime:milli"`
+		CreatedAt    time.Time `json:"created_at" gorm:"autoCreateTime:milli;index:idx_interview_user_created,priority:2"`
 		UpdatedAt    time.Time `json:"updated_at" gorm:"autoUpdateTime:milli"`
 	}
 )
@@ -69,10 +69,20 @@ func (i *_InterviewRecord) ListInterviewRecords(userID uint, page, pageSize *int
 		return nil, 0, err
 	}
 
-	// 分页查询
-	if err := query.Offset(int((*page - 1) * *pageSize)).
-		Limit(int(*pageSize)).
-		Order("created_at DESC").
+	// Bound page size and calculate offsets in int64 to avoid int32 overflow.
+	pageNum, pageLimit := int64(1), int64(10)
+	if page != nil && *page > 0 {
+		pageNum = int64(*page)
+	}
+	if pageSize != nil && *pageSize > 0 {
+		pageLimit = int64(*pageSize)
+	}
+	if pageLimit > 100 {
+		pageLimit = 100
+	}
+	if err := query.Offset(int((pageNum - 1) * pageLimit)).
+		Limit(int(pageLimit)).
+		Order("created_at DESC, id DESC").
 		Find(&records).Error; err != nil {
 		return nil, 0, err
 	}

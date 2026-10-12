@@ -17,5 +17,7 @@ frontend/next/
 /backend/server.exe
 /frontend/lint.log
 /frontend/tsc_output.txt
+# 本地测试报告、原始日志与临时运行文件
+/tmp/
 # 忽略营销文档
 doc/营销/

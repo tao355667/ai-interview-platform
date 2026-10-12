@@ -171,7 +171,7 @@ func TestTranscribeInterviewAudioPassesQuestionText(t *testing.T) {
 	if resp.StatusCode() != http.StatusOK {
 		t.Fatalf("expected 200, got %d", resp.StatusCode())
 	}
-	if fake.lastReq.QuestionText != "请你介绍一下 go-zero 的服务治理能力" {
+	if fake.lastReq.QuestionText != "Please introduce go-zero's service governance capabilities" {
 		t.Fatalf("expected question_text to be forwarded, got %q", fake.lastReq.QuestionText)
 	}
 	if fake.lastReq.SessionID != "session-1" {

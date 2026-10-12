@@ -185,8 +185,8 @@ If you (the main interviewer) decide this turn should be handled by the technica
 		}
 
 		// 发送就绪事件
-		SendReadyEventWithSession(e.writer, questionIndex, session.SessionID)
 		e.sessionManager.ClearAnswer(session.SessionID)
+		SendReadyEventWithSession(e.writer, questionIndex, session.SessionID)
 
 		// 等待用户回答
 		log.Printf("[Interview Engine] Waiting for answer, sessionID: %s, question: %d/%d", session.SessionID, questionIndex, maxQuestions)
@@ -205,7 +205,7 @@ If you (the main interviewer) decide this turn should be handled by the technica
 		allDialogues = append(allDialogues, dialogue)
 
 		// 更新会话中的问题计数
-		session.QuestionCount = int32(questionIndex)
+		session.SetQuestionCount(int32(questionIndex))
 
 		// 更新最近的历史记录（保留最近2道题）
 		recentHistory = append(recentHistory, HistoryItem{

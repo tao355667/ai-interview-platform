@@ -3,11 +3,57 @@ package ratelimiter
 import (
 	"context"
 	"errors"
+	"sync"
+	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/alicebob/miniredis/v2"
 	"github.com/redis/go-redis/v9"
 )
+
+// Independent instances must share one Redis quota without overwriting members.
+func TestAllowRequest_RPM_SharedAcrossInstances(t *testing.T) {
+	client, mr := setupTestRedis(t)
+	defer mr.Close()
+	defer client.Close()
+	const quota = 100
+	var allowed, denied, unexpected atomic.Int64
+	var workers sync.WaitGroup
+	start := make(chan struct{})
+	for i := 0; i < 16; i++ {
+		limiter := NewRedisRateLimiter(client, Config{Enabled: true, DefaultRPM: quota, DefaultTPM: 100000, FailureMode: FailureModeClosed})
+		workers.Add(1)
+		go func() {
+			defer workers.Done()
+			<-start
+			for j := 0; j < 100; j++ {
+				err := limiter.AllowRequest(context.Background(), "shared-test-key", "shared-model")
+				var limited *RateLimitError
+				switch {
+				case err == nil:
+					allowed.Add(1)
+				case errors.As(err, &limited):
+					denied.Add(1)
+				default:
+					unexpected.Add(1)
+				}
+			}
+		}()
+	}
+	close(start)
+	workers.Wait()
+	if allowed.Load() != quota || denied.Load() != 1500 || unexpected.Load() != 0 {
+		t.Fatalf("shared quota: allowed=%d denied=%d dependency errors=%d", allowed.Load(), denied.Load(), unexpected.Load())
+	}
+	stored, err := client.ZCard(context.Background(), buildKey("shared-test-key", "shared-model", "rpm")).Result()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if stored != quota {
+		t.Fatalf("expected %d distinct Redis members, got %d", quota, stored)
+	}
+}
 
 func setupTestRedis(t *testing.T) (*redis.Client, *miniredis.Miniredis) {
 	t.Helper()
@@ -364,5 +410,43 @@ func TestAllowRequest_RedisFailureModeClosed(t *testing.T) {
 	var depErr *DependencyUnavailableError
 	if !errors.As(err, &depErr) {
 		t.Fatalf("expected DependencyUnavailableError, got %T", err)
+	}
+}
+
+func TestAdjustTokensPreservesWindowAndTTL(t *testing.T) {
+	client, mr := setupTestRedis(t)
+	defer mr.Close()
+	ctx := context.Background()
+	rl := NewRedisRateLimiter(client, Config{Enabled: true, DefaultTPM: 1000})
+	member, err := rl.PreAllocateTokens(ctx, "adjust", "model", 500)
+	if err != nil {
+		t.Fatal(err)
+	}
+	key := buildKey("adjust", "model", "tpm")
+	score := float64(time.Now().Add(-30 * time.Second).UnixMicro())
+	client.ZAdd(ctx, key, redis.Z{Score: score, Member: member})
+	client.Expire(ctx, key, 45*time.Second)
+	rl.AdjustTokens(ctx, "adjust", "model", member, 200)
+	rl.AdjustTokens(ctx, "adjust", "model", member, 900) // duplicate response cannot recreate reservation
+	_, usage, err := rl.GetUsage(ctx, "adjust", "model")
+	if err != nil || usage != 200 {
+		t.Fatalf("usage=%d err=%v", usage, err)
+	}
+	entries := client.ZRangeWithScores(ctx, key, 0, -1).Val()
+	if len(entries) != 1 || entries[0].Score != score {
+		t.Fatalf("reservation timestamp changed: %v", entries)
+	}
+	if ttl := client.TTL(ctx, key).Val(); ttl <= 0 || ttl > 45*time.Second {
+		t.Fatalf("TTL lost: %v", ttl)
+	}
+	client.ZAdd(ctx, key, redis.Z{Score: float64(time.Now().Add(-61 * time.Second).UnixMicro()), Member: entries[0].Member})
+	rl.AdjustTokens(ctx, "adjust", "model", entries[0].Member.(string), 700)
+	_, usage, err = rl.GetUsage(ctx, "adjust", "model")
+	if err != nil || usage != 0 {
+		t.Fatalf("expired reservation revived: %d %v", usage, err)
+	}
+	rl.AdjustTokens(ctx, "adjust", "model", member, 800)
+	if client.Exists(ctx, key).Val() != 0 {
+		t.Fatal("missing reservation recreated")
 	}
 }

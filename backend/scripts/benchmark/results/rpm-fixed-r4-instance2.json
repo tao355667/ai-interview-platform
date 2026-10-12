@@ -1,0 +1,22 @@
+{
+  "allowed": 47,
+  "arch": "arm64",
+  "concurrency": 50,
+  "denied": 953,
+  "dependency_errors": 0,
+  "elapsed_s": 0.09127025,
+  "go_version": "go1.25.1",
+  "gomaxprocs": 10,
+  "limit": 100,
+  "mean_ms": 4.396768244,
+  "mode": "rpm",
+  "operations": 1000,
+  "os": "darwin",
+  "p50_ms": 3.343458,
+  "p95_ms": 7.136583,
+  "p99_ms": 24.041708,
+  "recorded_at": "2026-10-06T03:23:00+08:00",
+  "rpm_usage": 100,
+  "throughput_per_s": 10956.472673187594,
+  "tpm_usage": 0
+}

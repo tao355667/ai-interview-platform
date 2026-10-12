@@ -5,315 +5,414 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/panjf2000/ants/v2"
 	"github.com/redis/go-redis/v9"
 )
 
-// containsAny 检查字符串是否包含任意一个子串
-func containsAny(s string, substrs ...string) bool {
-	for _, substr := range substrs {
-		if len(substr) > 0 && len(s) >= len(substr) {
-			for i := 0; i <= len(s)-len(substr); i++ {
-				if s[i:i+len(substr)] == substr {
-					return true
-				}
-			}
-		}
-	}
-	return false
+// StreamOptions controls retry and worker limits. Handlers must be idempotent:
+// a process can die after committing its side effect but before acknowledging.
+type StreamOptions struct {
+	Workers       int
+	RetryIdle     time.Duration
+	PollInterval  time.Duration
+	MaxDeliveries int64
 }
 
-// RedisStreamQueue Redis Stream 消息队列实现
-// 相比 Pub/Sub，Stream 提供：
-// 1. 消息持久化
-// 2. 消费组 (Consumer Group) 支持
-// 3. ACK 机制，确保至少一次消费 (At-least-once)
-// 4. 断点续传能力
+// RedisStreamQueue uses pending entries for recovery and renewable leases to
+// keep healthy, long-running handlers from being reclaimed by another consumer.
+// Redis persistence remains a deployment setting, not a queue guarantee.
 type RedisStreamQueue struct {
 	client        *redis.Client
 	mu            sync.RWMutex
 	handlers      []MessageHandler
 	done          chan struct{}
+	closeOnce     sync.Once
 	pool          *ants.Pool
-	consumerGroup string // 消费组名称
-	consumerName  string // 消费者名称
+	consumerGroup string
+	consumerName  string
+	options       StreamOptions
+	active        atomic.Int64
 }
 
-// NewRedisStreamQueue 创建 Redis Stream 消息队列
-func NewRedisStreamQueue(client *redis.Client, consumerGroup, consumerName string) *RedisStreamQueue {
+func NewRedisStreamQueue(client *redis.Client, group, consumer string) *RedisStreamQueue {
+	return NewRedisStreamQueueWithOptions(client, group, consumer, StreamOptions{})
+}
+
+func NewRedisStreamQueueWithOptions(client *redis.Client, group, consumer string, options StreamOptions) *RedisStreamQueue {
 	if client == nil {
-		log.Fatal("Redis client cannot be nil")
+		panic("Redis client cannot be nil")
 	}
-
-	if consumerGroup == "" {
-		consumerGroup = "interview-consumer-group"
+	if group == "" {
+		group = "interview-consumer-group"
 	}
-
-	if consumerName == "" {
-		consumerName = fmt.Sprintf("consumer-%d", time.Now().UnixNano())
+	if consumer == "" {
+		consumer = "consumer-" + uuid.NewString()
 	}
-
-	// 初始化协程池，限制最大并发数为 1000
-	pool, err := ants.NewPool(1000)
+	if options.Workers <= 0 {
+		options.Workers = 1000
+	}
+	if options.RetryIdle <= 0 {
+		options.RetryIdle = 30 * time.Second
+	}
+	if options.PollInterval <= 0 {
+		options.PollInterval = 5 * time.Second
+	}
+	if options.MaxDeliveries <= 0 {
+		options.MaxDeliveries = 3
+	}
+	pool, err := ants.NewPool(options.Workers)
 	if err != nil {
-		log.Fatalf("Failed to create goroutine pool: %v", err)
+		panic(err)
 	}
-
-	return &RedisStreamQueue{
-		client:        client,
-		done:          make(chan struct{}),
-		pool:          pool,
-		consumerGroup: consumerGroup,
-		consumerName:  consumerName,
-	}
+	return &RedisStreamQueue{client: client, done: make(chan struct{}), pool: pool,
+		consumerGroup: group, consumerName: consumer, options: options}
 }
 
-// Publish 发布消息到 Redis Stream
 func (q *RedisStreamQueue) Publish(ctx context.Context, message *Message) error {
-	// 序列化消息 Payload
-	payloadJSON, err := json.Marshal(message.Payload)
+	select {
+	case <-q.done:
+		return fmt.Errorf("message queue is closed")
+	default:
+	}
+	if message == nil {
+		return fmt.Errorf("message cannot be nil")
+	}
+	payload, err := json.Marshal(message.Payload)
 	if err != nil {
-		return fmt.Errorf("failed to marshal message payload: %w", err)
+		return fmt.Errorf("marshal payload: %w", err)
 	}
-
-	// 根据消息类型使用不同的 Stream
-	streamKey := fmt.Sprintf("interview:stream:%s", message.Type)
-
-	// 构建 Stream 消息体
-	values := map[string]interface{}{
-		"type":      string(message.Type),
-		"payload":   string(payloadJSON),
-		"timestamp": time.Now().Unix(),
-	}
-
-	log.Printf("[RedisStream] Publishing message to stream %s", streamKey)
-
-	// 使用 XADD 添加消息到 Stream
-	// * 表示自动生成消息 ID
-	result := q.client.XAdd(ctx, &redis.XAddArgs{
-		Stream: streamKey,
-		MaxLen: 10000, // 限制 Stream 最大长度，防止无限增长
-		Approx: true,  // 使用近似裁剪，性能更好
-		Values: values,
-	})
-
-	if err := result.Err(); err != nil {
-		return fmt.Errorf("failed to add message to stream: %w", err)
-	}
-
-	messageID := result.Val()
-	log.Printf("[RedisStream] Message published successfully with ID: %s", messageID)
-
-	return nil
+	// MAXLEN can delete pending or unread jobs. Retention is handled separately,
+	// using the oldest ID still needed by any consumer group.
+	return q.client.XAdd(ctx, &redis.XAddArgs{Stream: "interview:stream:" + string(message.Type),
+		Values: map[string]interface{}{"type": string(message.Type), "payload": string(payload), "timestamp": time.Now().Unix()}}).Err()
 }
 
-// Subscribe 订阅消息（使用消费组）
 func (q *RedisStreamQueue) Subscribe(ctx context.Context, handler MessageHandler) error {
+	if handler == nil {
+		return fmt.Errorf("handler cannot be nil")
+	}
 	q.mu.Lock()
 	q.handlers = append(q.handlers, handler)
 	q.mu.Unlock()
-
-	// 所有需要订阅的 Stream
-	streams := []string{
-		fmt.Sprintf("interview:stream:%s", MessageTypeEvaluationReport),
-		fmt.Sprintf("interview:stream:%s", MessageTypeTopicEvaluation),
-		fmt.Sprintf("interview:stream:%s", MessageTypeResumeParse),
-	}
-
-	log.Printf("[RedisStream] Consumer %s subscribing to streams: %v", q.consumerName, streams)
-
-	// 为每个 Stream 创建消费组（如果不存在）
+	streams := []string{"interview:stream:" + string(MessageTypeEvaluationReport),
+		"interview:stream:" + string(MessageTypeTopicEvaluation), "interview:stream:" + string(MessageTypeResumeParse)}
 	for _, stream := range streams {
-		err := q.createConsumerGroup(ctx, stream)
-		if err != nil {
-			log.Printf("[RedisStream] Warning: failed to create consumer group for %s: %v", stream, err)
-			// 继续执行，可能消费组已存在
+		if err := q.createConsumerGroup(ctx, stream); err != nil {
+			return err
 		}
 	}
-
-	log.Printf("[RedisStream] Successfully initialized consumer groups, starting to read messages...")
-
-	// 使用 XREADGROUP 读取消息
-	return q.readMessages(ctx, streams)
-}
-
-// createConsumerGroup 创建消费组
-func (q *RedisStreamQueue) createConsumerGroup(ctx context.Context, stream string) error {
-	// 使用 $ 表示从当前最新位置开始消费
-	// 对于已有消息的 Stream，使用 0 表示从头开始消费
-	err := q.client.XGroupCreateMkStream(ctx, stream, q.consumerGroup, "0").Err()
-	if err != nil {
-		// 如果消费组已存在，忽略错误
-		if err.Error() == "BUSYGROUP Consumer Group name already exists" {
-			log.Printf("[RedisStream] Consumer group %s already exists for stream %s", q.consumerGroup, stream)
-			return nil
-		}
-		return err
-	}
-	log.Printf("[RedisStream] Created consumer group %s for stream %s", q.consumerGroup, stream)
-	return nil
-}
-
-// readMessages 读取消息
-func (q *RedisStreamQueue) readMessages(ctx context.Context, streams []string) error {
-	messageCount := 0
-
-	for {
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+	go func() {
 		select {
-		case <-ctx.Done():
-			log.Printf("[RedisStream] Context cancelled, stopping subscription (received %d messages)", messageCount)
-			return ctx.Err()
 		case <-q.done:
-			log.Printf("[RedisStream] Queue closed, stopping subscription (received %d messages)", messageCount)
-			return nil
-		default:
+			cancel()
+		case <-ctx.Done():
 		}
-
-		// 使用 XREADGROUP 读取消息
-		// > 表示读取尚未被该消费组消费的新消息
-		streamArgs := make([]string, 0, len(streams)*2)
-		for _, stream := range streams {
-			streamArgs = append(streamArgs, stream)
-		}
-
-		for range streams {
-			streamArgs = append(streamArgs, ">")
-		}
-
-		result, err := q.client.XReadGroup(ctx, &redis.XReadGroupArgs{
-			Group:    q.consumerGroup,
-			Consumer: q.consumerName,
-			Streams:  streamArgs,
-			Count:    10,              // 每次最多读取 10 条消息
-			Block:    1 * time.Second, // 阻塞等待 1 秒
-			NoAck:    false,
-		}).Result()
-
-		if err != nil {
-			// redis.Nil 表示没有新消息，这是正常情况
-			if err == redis.Nil {
-				continue
+	}()
+	go q.recoverPending(ctx, streams)
+	args := append(append([]string{}, streams...), ">", ">", ">")
+	for ctx.Err() == nil {
+		// Do not read more work while all workers are occupied. Jobs stay unread or
+		// pending instead of being ACKed when Submit reports overload.
+		if q.available() == 0 {
+			if !waitStream(ctx, 10*time.Millisecond) {
+				break
 			}
-
-			// 忽略 Stream 不存在或 ID 无效的错误（Stream 可能还未创建）
-			errMsg := err.Error()
-			if containsAny(errMsg, "NOGROUP", "Invalid stream ID", "stream not found") {
-				log.Printf("[RedisStream] Stream not ready yet (will retry): %v", err)
-				time.Sleep(2 * time.Second) // 等待 Stream 被创建
-				continue
-			}
-
-			log.Printf("[RedisStream] Error reading messages: %v", err)
-			time.Sleep(1 * time.Second) // 出错后等待一段时间再重试
 			continue
 		}
-
-		// 处理读取到的消息
-		for _, stream := range result {
-			for _, msg := range stream.Messages {
-				messageCount++
-				log.Printf("[RedisStream] Received message #%d from stream %s (ID: %s)",
-					messageCount, stream.Stream, msg.ID)
-
-				// 提取消息数据
-				messageType, ok := msg.Values["type"].(string)
-				if !ok {
-					log.Printf("[RedisStream] Invalid message type")
-					// 即使解析失败也要 ACK，避免阻塞
-					q.ackMessage(ctx, stream.Stream, msg.ID)
-					continue
-				}
-
-				payloadStr, ok := msg.Values["payload"].(string)
-				if !ok {
-					log.Printf("[RedisStream] Invalid payload")
-					q.ackMessage(ctx, stream.Stream, msg.ID)
-					continue
-				}
-
-				// 反序列化 Payload
-				var payload map[string]interface{}
-				if err := json.Unmarshal([]byte(payloadStr), &payload); err != nil {
-					log.Printf("[RedisStream] Failed to unmarshal payload: %v", err)
-					q.ackMessage(ctx, stream.Stream, msg.ID)
-					continue
-				}
-
-				// 构建 Message 对象
-				message := &Message{
-					Type:    MessageType(messageType),
-					Payload: payload,
-				}
-
-				// 异步调用所有处理器
-				q.mu.RLock()
-				handlers := q.handlers
-				q.mu.RUnlock()
-
-				// 使用协程池处理消息
-				for _, h := range handlers {
-					handler := h
-					msgCopy := message
-					streamKey := stream.Stream
-					msgID := msg.ID
-
-					err := q.pool.Submit(func() {
-						// 处理消息
-						if err := handler(ctx, msgCopy); err != nil {
-							log.Printf("[RedisStream] Error processing message: %v, type: %s, ID: %s",
-								err, msgCopy.Type, msgID)
-							// 处理失败不 ACK，消息会保留在 Pending 列表中
-							// 可以通过 XPENDING 和 XCLAIM 进行后续处理
-							return
-						}
-
-						// 处理成功，ACK 消息
-						q.ackMessage(ctx, streamKey, msgID)
-					})
-
-					if err != nil {
-						log.Printf("[RedisStream] Failed to submit task to pool: %v", err)
-						// Pool 满了，直接 ACK 避免阻塞
-						q.ackMessage(ctx, stream.Stream, msg.ID)
-					}
+		count := q.available() / len(streams)
+		if count < 1 {
+			count = 1
+		}
+		if count > 10 {
+			count = 10
+		}
+		batches, err := q.client.XReadGroup(ctx, &redis.XReadGroupArgs{Group: q.consumerGroup,
+			Consumer: q.consumerName, Streams: args, Count: int64(count), Block: time.Second}).Result()
+		if err == redis.Nil {
+			continue
+		}
+		if err != nil {
+			if ctx.Err() != nil {
+				break
+			}
+			if strings.Contains(err.Error(), "NOGROUP") {
+				for _, stream := range streams {
+					_ = q.createConsumerGroup(ctx, stream)
 				}
 			}
+			log.Printf("[RedisStream] read failed: %v", err)
+			if !waitStream(ctx, time.Second) {
+				break
+			}
+			continue
+		}
+		for _, batch := range batches {
+			for _, msg := range batch.Messages {
+				q.dispatch(ctx, batch.Stream, msg.ID, &msg)
+			}
+		}
+	}
+	return ctx.Err()
+}
+
+func waitStream(ctx context.Context, delay time.Duration) bool {
+	timer := time.NewTimer(delay)
+	defer timer.Stop()
+	select {
+	case <-ctx.Done():
+		return false
+	case <-timer.C:
+		return true
+	}
+}
+
+func (q *RedisStreamQueue) createConsumerGroup(ctx context.Context, stream string) error {
+	err := q.client.XGroupCreateMkStream(ctx, stream, q.consumerGroup, "0").Err()
+	if err != nil && strings.HasPrefix(err.Error(), "BUSYGROUP") {
+		return nil
+	}
+	return err
+}
+
+// Taking the lease and claiming a pending delivery are atomic with respect to
+// other consumers. Normal deliveries already belong to this consumer.
+var claimDelivery = redis.NewScript(`
+if not redis.call('SET', KEYS[2], ARGV[3], 'NX', 'PX', ARGV[4]) then return {} end
+local pending = redis.call('XPENDING', KEYS[1], ARGV[1], ARGV[5], ARGV[5], 1)
+if #pending == 0 then redis.call('DEL', KEYS[2]); return {} end
+if ARGV[6] == '0' and pending[1][2] ~= ARGV[2] then redis.call('DEL', KEYS[2]); return {} end
+if ARGV[6] == '1' then
+ local result = redis.call('XCLAIM', KEYS[1], ARGV[1], ARGV[2], ARGV[7], ARGV[5])
+ if #result == 0 then redis.call('DEL', KEYS[2]) end
+ return result
+end
+return {{ARGV[5]}}
+`)
+var renewDelivery = redis.NewScript(`
+if redis.call('GET', KEYS[2]) ~= ARGV[3] then return 0 end
+redis.call('PEXPIRE', KEYS[2], ARGV[4])
+redis.call('XCLAIM', KEYS[1], ARGV[1], ARGV[2], 0, ARGV[5], 'JUSTID')
+return 1
+`)
+var finishDelivery = redis.NewScript(`
+if redis.call('GET', KEYS[2]) ~= ARGV[1] then return 0 end
+if ARGV[4] == 'ack' then redis.call('XACK', KEYS[1], ARGV[2], ARGV[3]) end
+if ARGV[4] == 'dead' then
+ redis.call('XADD', KEYS[3], '*', 'source_stream', KEYS[1], 'source_id', ARGV[3],
+  'consumer_group', ARGV[2], 'message', ARGV[5], 'error', ARGV[6])
+ redis.call('XACK', KEYS[1], ARGV[2], ARGV[3])
+end
+redis.call('DEL', KEYS[2])
+return 1
+`)
+
+func (q *RedisStreamQueue) recoverPending(ctx context.Context, streams []string) {
+	for ctx.Err() == nil {
+		for _, stream := range streams {
+			// Scan all eligible pending IDs, not only the first page (which may consist
+			// entirely of long-running, leased jobs).
+			start := "-"
+			for ctx.Err() == nil && q.available() > 0 {
+				pending, err := q.client.XPendingExt(ctx, &redis.XPendingExtArgs{Stream: stream,
+					Group: q.consumerGroup, Idle: q.options.RetryIdle, Start: start, End: "+", Count: 100}).Result()
+				if err != nil || len(pending) == 0 {
+					break
+				}
+				for _, p := range pending {
+					q.dispatch(ctx, stream, p.ID, nil)
+				}
+				start = "(" + pending[len(pending)-1].ID
+				if len(pending) < 100 {
+					break
+				}
+			}
+			if err := q.CleanupOldMessages(ctx, stream, 10000); err != nil && ctx.Err() == nil {
+				log.Printf("[RedisStream] safe retention failed: %v", err)
+			}
+		}
+		if !waitStream(ctx, q.options.PollInterval) {
+			return
 		}
 	}
 }
 
-// ackMessage 确认消息已处理
-func (q *RedisStreamQueue) ackMessage(ctx context.Context, stream, messageID string) {
-	err := q.client.XAck(ctx, stream, q.consumerGroup, messageID).Err()
+// ants.Free counts uncreated workers, not available processing slots: idle
+// workers remain alive until expiry. Track actual in-flight jobs separately.
+func (q *RedisStreamQueue) available() int {
+	return q.options.Workers - int(q.active.Load())
+}
+
+func (q *RedisStreamQueue) dispatch(ctx context.Context, stream, id string, message *redis.XMessage) {
+	if q.available() == 0 || ctx.Err() != nil {
+		return
+	}
+	// Copy the delivery before scheduling. Acquire leases inside bounded workers:
+	// doing a synchronous Redis round trip for every message in the reader would
+	// serialize dispatch and starve an otherwise idle worker pool.
+	var delivery *redis.XMessage
+	if message != nil {
+		copy := *message
+		delivery = &copy
+	}
+	for {
+		active := q.active.Load()
+		if active >= int64(q.options.Workers) {
+			return
+		}
+		if q.active.CompareAndSwap(active, active+1) {
+			break
+		}
+	}
+	err := q.pool.Submit(func() {
+		defer q.active.Add(-1)
+		lease := stream + ":lease:" + q.consumerGroup + ":" + id
+		owner := uuid.NewString()
+		reclaim := "0"
+		if delivery == nil {
+			reclaim = "1"
+		}
+		result, err := claimDelivery.Run(ctx, q.client, []string{stream, lease}, q.consumerGroup,
+			q.consumerName, owner, q.options.RetryIdle.Milliseconds(), id, reclaim, q.options.RetryIdle.Milliseconds()).Slice()
+		if err != nil || len(result) == 0 {
+			return
+		}
+		if delivery == nil {
+			messages, err := q.client.XRangeN(ctx, stream, id, id, 1).Result()
+			if err != nil || len(messages) == 0 {
+				q.finish(ctx, stream, id, lease, owner, "release", nil, nil)
+				return
+			}
+			delivery = &messages[0]
+		}
+		q.process(ctx, stream, *delivery, lease, owner)
+	})
 	if err != nil {
-		log.Printf("[RedisStream] Failed to ACK message %s: %v", messageID, err)
-	} else {
-		log.Printf("[RedisStream] Message ACKed: %s", messageID)
+		q.active.Add(-1)
+	}
+	// Submit failure leaves the entry pending; no lease was acquired and no ACK
+	// was sent. Recovery will deliver it when capacity becomes available.
+}
+
+func (q *RedisStreamQueue) process(ctx context.Context, stream string, msg redis.XMessage, lease, owner string) {
+	taskCtx, cancel := context.WithCancel(ctx)
+	defer cancel()
+	// Heartbeats do not increment Redis's delivery counter (JUSTID).
+	go func() {
+		for waitStream(taskCtx, q.options.RetryIdle/3) {
+			ok, err := renewDelivery.Run(taskCtx, q.client, []string{stream, lease}, q.consumerGroup,
+				q.consumerName, owner, q.options.RetryIdle.Milliseconds(), msg.ID).Int()
+			if err != nil || ok != 1 {
+				cancel()
+				return
+			}
+		}
+	}()
+	var message Message
+	kind, kindOK := msg.Values["type"].(string)
+	payload, payloadOK := msg.Values["payload"].(string)
+	decodeErr := json.Unmarshal([]byte(payload), &message.Payload)
+	if !kindOK || !payloadOK || decodeErr != nil {
+		q.finish(taskCtx, stream, msg.ID, lease, owner, "dead", msg.Values, fmt.Errorf("invalid message payload"))
+		return
+	}
+	message.Type = MessageType(kind)
+	q.mu.RLock()
+	handlers := append([]MessageHandler{}, q.handlers...)
+	q.mu.RUnlock()
+	var handlerErr error
+	for _, handler := range handlers {
+		if handlerErr = invokeHandler(taskCtx, handler, &message); handlerErr != nil {
+			break
+		}
+	}
+	if taskCtx.Err() != nil {
+		return
+	} // expired lease/cancel: leave it pending
+	action := "ack"
+	if handlerErr != nil {
+		action = "release"
+		pending, err := q.client.XPendingExt(taskCtx, &redis.XPendingExtArgs{Stream: stream,
+			Group: q.consumerGroup, Start: msg.ID, End: msg.ID, Count: 1}).Result()
+		if err == nil && len(pending) > 0 && pending[0].RetryCount >= q.options.MaxDeliveries {
+			action = "dead"
+		}
+		log.Printf("[RedisStream] handler failed, ID=%s action=%s: %v", msg.ID, action, handlerErr)
+	}
+	q.finish(taskCtx, stream, msg.ID, lease, owner, action, msg.Values, handlerErr)
+}
+
+func invokeHandler(ctx context.Context, handler MessageHandler, message *Message) (err error) {
+	defer func() {
+		if value := recover(); value != nil {
+			err = fmt.Errorf("handler panic: %v", value)
+		}
+	}()
+	return handler(ctx, message)
+}
+
+func (q *RedisStreamQueue) finish(ctx context.Context, stream, id, lease, owner, action string, values map[string]interface{}, cause error) {
+	body, _ := json.Marshal(values)
+	reason := ""
+	if cause != nil {
+		reason = cause.Error()
+	}
+	if _, err := finishDelivery.Run(ctx, q.client, []string{stream, lease, stream + ":dead"},
+		owner, q.consumerGroup, id, action, string(body), reason).Result(); err != nil {
+		log.Printf("[RedisStream] finish failed, ID=%s: %v", id, err)
 	}
 }
 
-// Close 关闭消息队列
 func (q *RedisStreamQueue) Close() error {
-	close(q.done)
-	q.pool.Release()
+	q.closeOnce.Do(func() { close(q.done); q.pool.Release() })
 	return nil
 }
+func (q *RedisStreamQueue) GetRedisClient() *redis.Client { return q.client }
 
-// GetRedisClient 获取 Redis 客户端（用于测试和其他用途）
-func (q *RedisStreamQueue) GetRedisClient() *redis.Client {
-	return q.client
-}
-
-// CleanupOldMessages 清理旧消息（可选的维护操作）
-// 通过 XTRIM 定期清理已确认的旧消息
+// CleanupOldMessages never trims past a pending or unread ID. maxLen is a soft
+// threshold: a backlog is retained even when it exceeds the requested length.
 func (q *RedisStreamQueue) CleanupOldMessages(ctx context.Context, stream string, maxLen int64) error {
-	err := q.client.XTrimMaxLen(ctx, stream, maxLen).Err()
-	if err != nil {
-		return fmt.Errorf("failed to trim stream %s: %w", stream, err)
+	if maxLen < 0 {
+		return fmt.Errorf("maxLen must be nonnegative")
 	}
-	log.Printf("[RedisStream] Trimmed stream %s to max length %d", stream, maxLen)
-	return nil
+	length, err := q.client.XLen(ctx, stream).Result()
+	if err != nil || length <= maxLen {
+		return err
+	}
+	groups, err := q.client.XInfoGroups(ctx, stream).Result()
+	if err != nil {
+		return err
+	}
+	if len(groups) == 0 {
+		return nil
+	}
+	// The Lua script evaluates group positions and trims in one operation, so an
+	// intervening delivery cannot turn an inspected ID into a deleted pending job.
+	return safeTrim.Run(ctx, q.client, []string{stream}).Err()
 }
+
+var safeTrim = redis.NewScript(`
+local groups=redis.call('XINFO','GROUPS',KEYS[1])
+local floor=nil
+local function less(a,b)
+ local am,as=string.match(a,'(%d+)%-(%d+)')
+ local bm,bs=string.match(b,'(%d+)%-(%d+)')
+ return tonumber(am)<tonumber(bm) or (tonumber(am)==tonumber(bm) and tonumber(as)<tonumber(bs))
+end
+for _,g in ipairs(groups) do
+ local name,last
+ for i=1,#g,2 do if g[i]=='name' then name=g[i+1] elseif g[i]=='last-delivered-id' then last=g[i+1] end end
+ local p=redis.call('XPENDING',KEYS[1],name)
+ if p[1]>0 and less(p[2],last) then last=p[2] end
+ if not floor or less(last,floor) then floor=last end
+end
+if floor then return redis.call('XTRIM',KEYS[1],'MINID',floor) end
+return 0
+`)

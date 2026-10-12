@@ -1,0 +1,19 @@
+{
+  "scope": "single real HTTP SSE first-question smoke test, no resume, Milvus not configured",
+  "events": {
+    "session_id": 1,
+    "start": 1,
+    "chunk": 41,
+    "structured_message": 1,
+    "ready_for_answer": 1
+  },
+  "ready": true,
+  "http_status": 200,
+  "content_type": "text/event-stream; charset=utf-8",
+  "record_id": 1001,
+  "first_content_ms": 8241.029208002146,
+  "ready_ms": 8253.819833000307,
+  "end_http_status": 200,
+  "end_business_code": 200,
+  "elapsed_ms": 8258.86666700535
+}

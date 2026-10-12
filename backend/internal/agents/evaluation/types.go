@@ -1,5 +1,7 @@
 package evaluation
 
+import "time"
+
 // NextAction 评分后建议的下一步动作
 type NextAction string
 
@@ -52,6 +54,9 @@ type EvaluationRequest struct {
 
 // EvaluatorConfig 评分器配置
 type EvaluatorConfig struct {
+	// Timeout bounds non-streaming scoring so a slow provider cannot stall an interview.
+	Timeout   time.Duration
+	MaxTokens int
 	// 分数阈值
 	DeepenThreshold int // 深入追问阈值，默认 8
 	LowerThreshold  int // 降低难度阈值，默认 4
@@ -66,6 +71,8 @@ type EvaluatorConfig struct {
 // DefaultEvaluatorConfig 返回默认配置
 func DefaultEvaluatorConfig() *EvaluatorConfig {
 	return &EvaluatorConfig{
+		Timeout:              30 * time.Second,
+		MaxTokens:            2048,
 		DeepenThreshold:      8,
 		LowerThreshold:       4,
 		MaxQuestionsPerTopic: 5,

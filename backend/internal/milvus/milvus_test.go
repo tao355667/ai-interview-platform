@@ -8,7 +8,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/cloudwego/eino-ext/components/document/transformer/splitter/recursive"
 	"interview-agents/internal/config"
+	"interview-agents/internal/milvus/splitter"
 
 	"github.com/cloudwego/eino/schema"
 	"github.com/joho/godotenv"
@@ -69,6 +71,9 @@ func getEnvOrDefault(key, defaultValue string) string {
 
 // TestMilvusManagerInit 测试 MilvusManager 初始化
 func TestMilvusManagerInit(t *testing.T) {
+	if testing.Short() {
+		t.Skip("requires Milvus and embedding provider; run without -short in an integration environment")
+	}
 
 	ctx := context.Background()
 	cfg := getTestConfig()
@@ -89,6 +94,9 @@ func TestMilvusManagerInit(t *testing.T) {
 
 // TestEmbeddingService 测试嵌入服务
 func TestEmbeddingService(t *testing.T) {
+	if testing.Short() {
+		t.Skip("requires Milvus and embedding provider; run without -short in an integration environment")
+	}
 
 	ctx := context.Background()
 	cfg := getTestConfig()
@@ -122,15 +130,11 @@ func TestEmbeddingService(t *testing.T) {
 
 // TestDocumentSplitter 测试文档分割服务
 func TestDocumentSplitter(t *testing.T) {
-
 	ctx := context.Background()
-	cfg := getTestConfig()
-
-	manager, err := InitMilvusManager(ctx, cfg)
+	service, err := splitter.NewDocumentSplitterService(ctx, &recursive.Config{ChunkSize: 80, OverlapSize: 10})
 	if err != nil {
-		t.Fatalf("Failed to initialize MilvusManager: %v", err)
+		t.Fatal(err)
 	}
-	defer manager.Close()
 
 	// 测试文档分割
 	longText := `
@@ -153,11 +157,14 @@ func TestDocumentSplitter(t *testing.T) {
 		},
 	}
 
-	chunks, err := manager.SplitterService.Split(ctx, []*schema.Document{doc})
+	chunks, err := service.Split(ctx, []*schema.Document{doc})
 	if err != nil {
 		t.Fatalf("Failed to split document: %v", err)
 	}
 
+	if len(chunks) < 2 {
+		t.Fatalf("expected multiple chunks, got %d", len(chunks))
+	}
 	t.Logf("Document split into %d chunks", len(chunks))
 	for i, chunk := range chunks {
 		t.Logf("Chunk %d (length: %d): %s...", i+1, len(chunk.Content), truncate(chunk.Content, 50))
@@ -166,6 +173,9 @@ func TestDocumentSplitter(t *testing.T) {
 
 // TestIndexerService 测试索引服务（存储文档）
 func TestIndexerService(t *testing.T) {
+	if testing.Short() {
+		t.Skip("requires Milvus and embedding provider; run without -short in an integration environment")
+	}
 
 	ctx := context.Background()
 	cfg := getTestConfig()
@@ -220,6 +230,9 @@ func TestIndexerService(t *testing.T) {
 
 // TestRetrieverService 测试检索服务
 func TestRetrieverService(t *testing.T) {
+	if testing.Short() {
+		t.Skip("requires Milvus and embedding provider; run without -short in an integration environment")
+	}
 
 	ctx := context.Background()
 	cfg := getTestConfig()
@@ -283,6 +296,9 @@ func TestRetrieverService(t *testing.T) {
 
 // TestFullWorkflow 测试完整的工作流程
 func TestFullWorkflow(t *testing.T) {
+	if testing.Short() {
+		t.Skip("requires Milvus and embedding provider; run without -short in an integration environment")
+	}
 
 	ctx := context.Background()
 	cfg := getTestConfig()
@@ -374,6 +390,9 @@ Go 语言特别适合以下场景：
 
 // TestIndexerMultipleDocuments 测试存储多个文档
 func TestIndexerMultipleDocuments(t *testing.T) {
+	if testing.Short() {
+		t.Skip("requires Milvus and embedding provider; run without -short in an integration environment")
+	}
 
 	ctx := context.Background()
 	cfg := getTestConfig()
@@ -430,6 +449,9 @@ func TestIndexerMultipleDocuments(t *testing.T) {
 
 // TestRetrieverMultipleQueries 测试多个查询
 func TestRetrieverMultipleQueries(t *testing.T) {
+	if testing.Short() {
+		t.Skip("requires Milvus and embedding provider; run without -short in an integration environment")
+	}
 
 	ctx := context.Background()
 	cfg := getTestConfig()
@@ -500,6 +522,9 @@ func TestRetrieverMultipleQueries(t *testing.T) {
 
 // TestMetricTypes 测试不同的距离度量类型
 func TestMetricTypes(t *testing.T) {
+	if testing.Short() {
+		t.Skip("requires Milvus and embedding provider; run without -short in an integration environment")
+	}
 
 	ctx := context.Background()
 
@@ -532,6 +557,9 @@ func truncate(s string, maxLen int) string {
 
 // TestHybridRetrieverIntegration 集成测试：混合检索服务
 func TestHybridRetrieverIntegration(t *testing.T) {
+	if testing.Short() {
+		t.Skip("requires Milvus and embedding provider; run without -short in an integration environment")
+	}
 	ctx := context.Background()
 	cfg := getTestConfig()
 

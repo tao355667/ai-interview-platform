@@ -7,71 +7,33 @@ import (
 	"testing"
 	"time"
 
-	"github.com/joho/godotenv"
 	"github.com/redis/go-redis/v9"
 )
 
-// loadEnv loads the .env file from the project root
-func loadEnv(t *testing.T) {
-	t.Helper()
-	envFile := "/Users/lucas/work/code/go/go-eino-interview-agent-co-write/.env"
-	if err := godotenv.Load(envFile); err != nil {
-		t.Skipf("Skipping integration test: failed to load .env: %v", err)
-	}
-}
-
-// connectRealRedis connects to Redis using .env config
+// Integration tests use an explicitly selected disposable Redis, never a
+// developer-specific .env or the application's default Redis address.
 func connectRealRedis(t *testing.T) *redis.Client {
 	t.Helper()
-
-	host := os.Getenv("REDIS_HOST")
-	port := os.Getenv("REDIS_PORT")
-	password := os.Getenv("REDIS_PASSWORD")
-
-	if host == "" {
-		host = "localhost"
+	addr := os.Getenv("TEST_REDIS_ADDR")
+	if addr == "" {
+		t.Skip("set TEST_REDIS_ADDR for real Redis integration tests")
 	}
-	if port == "" {
-		port = "6379"
-	}
-
-	client := redis.NewClient(&redis.Options{
-		Addr:     fmt.Sprintf("%s:%s", host, port),
-		Password: password,
-		DB:       1, // Use DB 1 for tests to avoid polluting DB 0
-	})
-
-	// Verify connection
+	client := redis.NewClient(&redis.Options{Addr: addr, DB: 2})
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
 	if err := client.Ping(ctx).Err(); err != nil {
-		t.Skipf("Skipping integration test: Redis not available at %s:%s: %v", host, port, err)
+		t.Fatalf("test Redis unavailable: %v", err)
 	}
-
-	// Clean up test keys on test finish
-	t.Cleanup(func() {
-		// Delete all test keys with our prefix
-		//ctx := context.Background()
-		//iter := client.Scan(ctx, 0, "ratelimit:*", 100).Iterator()
-		//for iter.Next(ctx) {
-		//	client.Del(ctx, iter.Val())
-		//}
-		//client.Close()
-	})
-
+	t.Cleanup(func() { client.Close() })
 	return client
 }
 
 // TestIntegration_RPM_WithRealRedis tests RPM rate limiting with a real Redis instance.
 // Requires Redis to be running (reads config from .env).
 func TestIntegration_RPM_WithRealRedis(t *testing.T) {
-	loadEnv(t)
 	client := connectRealRedis(t)
 
-	apiKey := os.Getenv("TEST_API_KEY")
-	if apiKey == "" {
-		t.Skip("Skipping: TEST_API_KEY not set in .env")
-	}
+	apiKey := fmt.Sprintf("test-%s-%d", t.Name(), time.Now().UnixNano())
 
 	rl := NewRedisRateLimiter(client, Config{
 		Enabled:    true,
@@ -121,13 +83,9 @@ func TestIntegration_RPM_WithRealRedis(t *testing.T) {
 
 // TestIntegration_TPM_PreAllocAndAdjust tests TPM pre-allocation and adjustment with real Redis.
 func TestIntegration_TPM_PreAllocAndAdjust(t *testing.T) {
-	loadEnv(t)
 	client := connectRealRedis(t)
 
-	apiKey := os.Getenv("TEST_API_KEY")
-	if apiKey == "" {
-		t.Skip("Skipping: TEST_API_KEY not set in .env")
-	}
+	apiKey := fmt.Sprintf("test-%s-%d", t.Name(), time.Now().UnixNano())
 
 	rl := NewRedisRateLimiter(client, Config{
 		Enabled:    true,
@@ -182,13 +140,9 @@ func TestIntegration_TPM_PreAllocAndAdjust(t *testing.T) {
 
 // TestIntegration_ModelSpecificLimits tests per-model rate limit overrides.
 func TestIntegration_ModelSpecificLimits(t *testing.T) {
-	loadEnv(t)
 	client := connectRealRedis(t)
 
-	apiKey := os.Getenv("TEST_API_KEY")
-	if apiKey == "" {
-		t.Skip("Skipping: TEST_API_KEY not set in .env")
-	}
+	apiKey := fmt.Sprintf("test-%s-%d", t.Name(), time.Now().UnixNano())
 
 	rl := NewRedisRateLimiter(client, Config{
 		Enabled:    true,

@@ -72,7 +72,7 @@ func StartInterviewStream(ctx context.Context, c *app.RequestContext) {
 
 	// 创建可取消的 context
 	cancelCtx, cancelFunc := context.WithCancel(ctx)
-	session.CancelFunc = cancelFunc
+	session.SetCancel(cancelFunc)
 
 	// 设置 SSE 响应头（必须在发送任何响应之前）
 	core.SetupSSEResponse(c)
@@ -150,11 +150,11 @@ func SubmitInterviewAnswer(ctx context.Context, c *app.RequestContext) {
 		answerToSubmit = *req.Action
 	}
 	if err := sm.SubmitAnswer(req.SessionID, answerToSubmit); err != nil {
-		response.InternalServerError(ctx, c, err.Error())
+		response.BadRequest(ctx, c, err.Error())
 		return
 	}
 	// 计算问题索引和是否为最后一个问题
-	questionIndex := session.QuestionCount
+	_, _, questionIndex := session.State()
 	isLastQuestion := false // 这个值由引擎在完成时设置
 
 	resp := &mianshiapi.InterviewSubmitInterviewAnswerResponse{
@@ -195,6 +195,7 @@ func GetSession(ctx context.Context, c *app.RequestContext) {
 		return
 	}
 
+	status, lastActivity, questionCount := session.State()
 	// 构建返回的会话信息
 	interviewSession := &mianshiapi.InterviewSession{
 		SessionID:  session.SessionID,
@@ -206,18 +207,18 @@ func GetSession(ctx context.Context, c *app.RequestContext) {
 		ResumeID:   &session.ResumeId,
 		HasResume:  &session.HasResume,
 		StartTime:  session.StartTime.UnixMilli(),
-		Status:     session.Status,
+		Status:     status,
 	}
 
 	if session.StartTime != (time.Time{}) {
-		endTime := session.LastActivity.UnixMilli()
+		endTime := lastActivity.UnixMilli()
 		interviewSession.EndTime = &endTime
 	}
 
 	elapsedTime := int64(time.Since(session.StartTime).Seconds())
-	currentQuestionIndex := session.QuestionCount
-	answeredCount := session.QuestionCount
-	totalCount := session.QuestionCount
+	currentQuestionIndex := questionCount
+	answeredCount := questionCount
+	totalCount := questionCount
 
 	resp := &mianshiapi.InterviewGetSessionResponse{
 		Session:              interviewSession,
@@ -267,18 +268,16 @@ func EndInterview(ctx context.Context, c *app.RequestContext) {
 		session.MarkDialoguesPersisted()
 	}
 
-	session.Status = "aborted"
 	endTime := time.Now()
-	session.LastActivity = endTime
+	session.SetStatus("aborted", endTime)
+	_, _, questionCount := session.State()
 	duration := int64(endTime.Sub(session.StartTime).Seconds())
 	endTimeMs := endTime.UnixMilli()
-	totalQuestions := session.QuestionCount
-	answeredQuestions := session.QuestionCount
+	totalQuestions := questionCount
+	answeredQuestions := questionCount
 
 	// 取消面试循环，关闭 SSE（须在落库之后，便于图内错误分支识别 DialoguesPersisted 并避免重复写入）
-	if session.CancelFunc != nil {
-		session.CancelFunc()
-	}
+	session.Cancel()
 	interviewSvc := interviewservice.NewInterviewService()
 	updateDTO := &interviewsapi.InterviewRecordDTO{
 		ID:       int64(session.RecordID),

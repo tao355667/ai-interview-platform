@@ -1,0 +1,24 @@
+{
+  "arch": "arm64",
+  "consume_elapsed_s": 1.607903792,
+  "consumers": 2,
+  "duplicates": 0,
+  "go_version": "go1.25.1",
+  "gomaxprocs": 10,
+  "mode": "queue",
+  "os": "darwin",
+  "peak_active_handlers": 2000,
+  "pending": 0,
+  "pool_capacity_per_consumer": 1000,
+  "processed": 5000,
+  "processed_per_consumer": [
+    2500,
+    2500
+  ],
+  "publish_elapsed_s": 0.866958708,
+  "published": 5000,
+  "recorded_at": "2026-10-06T03:16:45+08:00",
+  "synthetic_handler_delay_ms": 500,
+  "throughput_per_s": 3109.6387886371745,
+  "unique_sequences": 5000
+}

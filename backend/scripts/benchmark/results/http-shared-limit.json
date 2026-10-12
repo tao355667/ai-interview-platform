@@ -1,0 +1,27 @@
+{
+  "arch": "arm64",
+  "concurrency": 20,
+  "elapsed_s": 3.000940625,
+  "go_version": "go1.25.1",
+  "gomaxprocs": 10,
+  "invalid_200_bodies": 0,
+  "mean_ms": 0.9040551097145071,
+  "measurement_type": "closed-loop, same-machine client; JWT + Redis HTTP limiter + real MySQL query",
+  "mode": "http",
+  "operations": 66272,
+  "os": "darwin",
+  "p50_ms": 0.858042,
+  "p95_ms": 1.485291,
+  "p99_ms": 1.96375,
+  "recorded_at": "2026-10-06T03:17:05+08:00",
+  "status_counts": {
+    "200": 400,
+    "429": 65872
+  },
+  "success_per_s": 133.2915408814528,
+  "throughput_per_s": 22083.742493239097,
+  "urls": [
+    "http://127.0.0.1:18901/api/user/profile",
+    "http://127.0.0.1:18902/api/user/profile"
+  ]
+}

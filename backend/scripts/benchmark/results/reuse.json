@@ -1,0 +1,14 @@
+{
+  "arch": "arm64",
+  "go_version": "go1.25.1",
+  "gomaxprocs": 10,
+  "mode": "reuse",
+  "no_keepalive_tcp_connections": 100,
+  "os": "darwin",
+  "pooled_elapsed_s": 0.008873208,
+  "pooled_requests": 100,
+  "pooled_tcp_connections": 1,
+  "recorded_at": "2026-10-06T03:16:46+08:00",
+  "requests": 100,
+  "scope": "sequential real project OpenAI client against local mock; no inference latency measured"
+}

@@ -11,6 +11,9 @@ import (
 
 // TestFullWorkflowWithMarkdown 覆盖每个数据源类别的单个与批量存储，以及检索
 func TestFullWorkflowWithMarkdown(t *testing.T) {
+	if testing.Short() {
+		t.Skip("requires Milvus and embedding provider; run without -short in an integration environment")
+	}
 	ctx := context.Background()
 	cfg := getTestConfig()
 
@@ -358,6 +361,9 @@ func TestFullWorkflowWithMarkdown(t *testing.T) {
 
 // TestImportDirectory 测试导入整个目录
 func TestImportDirectory(t *testing.T) {
+	if testing.Short() {
+		t.Skip("requires Milvus and embedding provider; run without -short in an integration environment")
+	}
 	ctx := context.Background()
 	cfg := getTestConfig()
 

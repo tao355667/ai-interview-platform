@@ -1,19 +1,52 @@
 package tools
 
 import (
+	"bytes"
 	"context"
+	"fmt"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 )
 
-const testPDFPath = "C:\\Users\\LittleBear\\Desktop\\GoTest.pdf"
+// Build a portable, synthetic text PDF; no personal files or OCR service needed.
+func testPDFPath(t *testing.T) string {
+	t.Helper()
+	var buf bytes.Buffer
+	buf.WriteString("%PDF-1.4\n")
+	content := "BT /F1 12 Tf 50 750 Td (Test Candidate) Tj 0 -20 Td (candidate@example.invalid) Tj 0 -20 Td (Skills: Go, Redis, MySQL) Tj ET"
+	objects := []string{
+		"<< /Type /Catalog /Pages 2 0 R >>",
+		"<< /Type /Pages /Kids [3 0 R] /Count 1 >>",
+		"<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 4 0 R >> >> /Contents 5 0 R >>",
+		"<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>",
+		fmt.Sprintf("<< /Length %d >>\nstream\n%s\nendstream", len(content), content),
+	}
+	offsets := []int{0}
+	for i, object := range objects {
+		offsets = append(offsets, buf.Len())
+		fmt.Fprintf(&buf, "%d 0 obj\n%s\nendobj\n", i+1, object)
+	}
+	xref := buf.Len()
+	fmt.Fprintf(&buf, "xref\n0 %d\n0000000000 65535 f \n", len(offsets))
+	for _, offset := range offsets[1:] {
+		fmt.Fprintf(&buf, "%010d 00000 n \n", offset)
+	}
+	fmt.Fprintf(&buf, "trailer\n<< /Size %d /Root 1 0 R >>\nstartxref\n%d\n%%%%EOF\n", len(offsets), xref)
+	path := filepath.Join(t.TempDir(), "resume.pdf")
+	if err := os.WriteFile(path, buf.Bytes(), 0600); err != nil {
+		t.Fatal(err)
+	}
+	return path
+}
 
 func TestExtractResume_Success(t *testing.T) {
 	ctx := context.Background()
 
 	t.Run("pdf_merge_mode", func(t *testing.T) {
 		req := &ResumeExtractionRequest{
-			FilePath:  testPDFPath,
+			FilePath:  testPDFPath(t),
 			EnableOCR: true,
 			Language:  "en",
 		}
@@ -37,9 +70,9 @@ func TestExtractResume_Success(t *testing.T) {
 		}
 	})
 
-	t.Run("chinese_pdf", func(t *testing.T) {
+	t.Run("language_zh", func(t *testing.T) {
 		req := &ResumeExtractionRequest{
-			FilePath:  testPDFPath,
+			FilePath:  testPDFPath(t),
 			EnableOCR: true,
 			Language:  "zh",
 		}
@@ -56,7 +89,7 @@ func TestExtractResume_Success(t *testing.T) {
 
 	t.Run("ocr_disabled", func(t *testing.T) {
 		req := &ResumeExtractionRequest{
-			FilePath:  testPDFPath,
+			FilePath:  testPDFPath(t),
 			EnableOCR: false,
 			Language:  "en",
 		}
@@ -79,7 +112,7 @@ func TestExtractResume_StructuredFields(t *testing.T) {
 	ctx := context.Background()
 
 	req := &ResumeExtractionRequest{
-		FilePath:  testPDFPath,
+		FilePath:  testPDFPath(t),
 		EnableOCR: true,
 		Language:  "en",
 	}
@@ -95,6 +128,9 @@ func TestExtractResume_StructuredFields(t *testing.T) {
 
 	t.Run("structured_fields_populated", func(t *testing.T) {
 		field := result.Structured
+		if field.Email != "candidate@example.invalid" {
+			t.Fatalf("unexpected extracted email: %q", field.Email)
+		}
 		if field.Email != "" {
 			if !strings.Contains(field.Email, "@") {
 				t.Errorf("邮箱格式不正确: %s", field.Email)

@@ -1,19 +1,23 @@
 package alert_test
 
 import (
-	"interview-agents/internal/alert"
-	"interview-agents/internal/config"
 	"errors"
 	"fmt"
+	"interview-agents/internal/alert"
+	"interview-agents/internal/config"
+	"os"
 	"testing"
 )
 
 // go test -v ./internal/alert -run TestSendDatabaseErrorAlert
 // TestSendDatabaseErrorAlert 测试数据库错误告警
 func TestSendDatabaseErrorAlert(t *testing.T) {
+	if testing.Short() {
+		t.Skip("external Feishu notification integration test")
+	}
 
 	// 真实的 Webhook URL
-	webhookURL := "https://open.feishu.cn/open-apis/bot/v2/hook/4c63a7fb-bb8b-44b5-ab00-b8d08ccc4dfa"
+	webhookURL := os.Getenv("TEST_FEISHU_WEBHOOK_URL")
 
 	if webhookURL == "" {
 		t.Skip("未配置真实的 Webhook URL，跳过集成测试")
@@ -33,13 +37,16 @@ func TestSendDatabaseErrorAlert(t *testing.T) {
 // TestSendFeishuAlert_Integration 集成测试（需要真实的飞书 Webhook URL）
 // 使用方法：设置环境变量 FEISHU_WEBHOOK_URL_TEST 为真实的 Webhook URL，然后运行测试
 func TestSendFeishuAlert_Integration(t *testing.T) {
+	if testing.Short() {
+		t.Skip("external Feishu notification integration test")
+	}
 	// 跳过集成测试（除非明确指定）
 	if testing.Short() {
 		t.Skip("跳过集成测试")
 	}
 
 	// 从环境变量读取真实的 Webhook URL
-	webhookURL := "https://open.feishu.cn/open-apis/bot/v2/hook/4c63a7fb-bb8b-44b5-ab00-b8d08ccc4dfa" // 在这里填写你的测试 Webhook URL，或从环境变量读取
+	webhookURL := os.Getenv("TEST_FEISHU_WEBHOOK_URL")
 
 	if webhookURL == "" {
 		t.Skip("未配置真实的 Webhook URL，跳过集成测试")

@@ -1,10 +1,10 @@
 package impl
 
 import (
-	interviewsapi "interview-agents/api/model/resume"
-	"interview-agents/internal/model"
 	"context"
 	"fmt"
+	interviewsapi "interview-agents/api/model/resume"
+	"interview-agents/internal/model"
 	"log"
 )
 
@@ -112,6 +112,9 @@ func (s *InterviewServiceImpl) ListInterviewRecords(ctx context.Context, userID 
 	}
 	if pageSize != nil && *pageSize > 0 {
 		pageSz = *pageSize
+	}
+	if pageSz > 100 {
+		pageSz = 100
 	}
 
 	// 调用 DAO 层获取数据

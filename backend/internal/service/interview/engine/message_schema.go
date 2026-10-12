@@ -1,6 +1,9 @@
 package core
 
-import "time"
+import (
+	"github.com/google/uuid"
+	"time"
+)
 
 // MessageSchema 结构化的多角色对话消息体
 // 符合第8章要求：8.2.3 通信协议：定义结构化的多角色对话消息体 (Message Schema)
@@ -166,5 +169,5 @@ func NewMessageSchema(role RoleType, content string, actionType ActionType) *Mes
 
 // generateMessageID 生成消息ID
 func generateMessageID() string {
-	return "msg_" + time.Now().Format("20060102150405") + "_" + randomString(8)
+	return "msg_" + uuid.NewString()
 }

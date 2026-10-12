@@ -27,27 +27,27 @@ type ResumeExtractionRequest struct {
 
 // ResumeField 简历字段结构化结果
 type ResumeField struct {
-	Name           string   `json:"name" description="姓名"`
-	Email          string   `json:"email" description="邮箱"`
-	Phone          string   `json:"phone" description="电话号码（含国际区号）"`
-	LinkedIn       string   `json:"linkedin" description="LinkedIn链接"`
-	GitHub         string   `json:"github" description="GitHub链接"`
-	Education      []string `json:"education" description="教育背景（学历/学校/专业/时间）"`
-	WorkExperience []string `json:"work_experience" description="工作经历（公司/职位/时间/职责）"`
-	Skills         []string `json:"skills" description="技能列表"`
-	Location       string   `json:"location" description="所在地"`
-	Summary        string   `json:"summary" description="个人简介/职业概述"`
+	Name           string   `json:"name" description:"姓名"`
+	Email          string   `json:"email" description:"邮箱"`
+	Phone          string   `json:"phone" description:"电话号码（含国际区号）"`
+	LinkedIn       string   `json:"linkedin" description:"LinkedIn链接"`
+	GitHub         string   `json:"github" description:"GitHub链接"`
+	Education      []string `json:"education" description:"教育背景（学历/学校/专业/时间）"`
+	WorkExperience []string `json:"work_experience" description:"工作经历（公司/职位/时间/职责）"`
+	Skills         []string `json:"skills" description:"技能列表"`
+	Location       string   `json:"location" description:"所在地"`
+	Summary        string   `json:"summary" description:"个人简介/职业概述"`
 }
 
 // ResumeExtractionResult 简历解析最终结果
 type ResumeExtractionResult struct {
-	Success    bool                   `json:"success" description="解析是否成功"`
-	RawText    string                 `json:"raw_text" description="提取的原始文本"`
-	Structured ResumeField            `json:"structured" description="结构化的简历字段"`
-	TotalPages int                    `json:"total_pages" description="文件总页数（PDF）/总段落（Word）"`
-	IsOCR      bool                   `json:"is_ocr" description="是否使用了OCR识别"`
-	ErrorMsg   string                 `json:"error_msg,omitempty" description="错误信息"`
-	Meta       map[string]interface{} `json:"meta,omitempty" description="元数据"`
+	Success    bool                   `json:"success" description:"解析是否成功"`
+	RawText    string                 `json:"raw_text" description:"提取的原始文本"`
+	Structured ResumeField            `json:"structured" description:"结构化的简历字段"`
+	TotalPages int                    `json:"total_pages" description:"文件总页数（PDF）/总段落（Word）"`
+	IsOCR      bool                   `json:"is_ocr" description:"是否使用了OCR识别"`
+	ErrorMsg   string                 `json:"error_msg,omitempty" description:"错误信息"`
+	Meta       map[string]interface{} `json:"meta,omitempty" description:"元数据"`
 }
 
 // 预编译正则表达式（英文简历字段匹配）

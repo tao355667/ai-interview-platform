@@ -1,0 +1,25 @@
+{
+  "arch": "arm64",
+  "concurrency": 50,
+  "elapsed_s": 10.003124167,
+  "go_version": "go1.25.1",
+  "gomaxprocs": 10,
+  "invalid_200_bodies": 0,
+  "mean_ms": 6.157289896668472,
+  "measurement_type": "closed-loop, same-machine client; JWT + Redis HTTP limiter + real MySQL query",
+  "mode": "http",
+  "operations": 81195,
+  "os": "darwin",
+  "p50_ms": 5.433625,
+  "p95_ms": 10.943125,
+  "p99_ms": 16.218208,
+  "recorded_at": "2026-10-06T03:14:00+08:00",
+  "status_counts": {
+    "200": 81195
+  },
+  "success_per_s": 8116.964124854096,
+  "throughput_per_s": 8116.964124854096,
+  "urls": [
+    "http://127.0.0.1:18899/api/interview/records?page=1\u0026page_size=10"
+  ]
+}

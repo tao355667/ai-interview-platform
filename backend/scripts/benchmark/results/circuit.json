@@ -1,0 +1,12 @@
+{
+  "arch": "arm64",
+  "attempted": 20,
+  "fast_rejections": 15,
+  "go_version": "go1.25.1",
+  "gomaxprocs": 10,
+  "mode": "circuit",
+  "os": "darwin",
+  "recorded_at": "2026-10-06T03:16:46+08:00",
+  "scope": "failure injection into actual circuit-breaker component",
+  "upstream_calls": 5
+}

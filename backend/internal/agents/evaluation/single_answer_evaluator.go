@@ -8,15 +8,17 @@ import (
 	"interview-agents/internal/agents/llm"
 	"log"
 	"strings"
+	"time"
 
 	"github.com/cloudwego/eino/schema"
 )
 
 // Evaluator 面试回答评分器
 type Evaluator struct {
-	userId uint
-	model  model.ToolCallingChatModel
-	config *EvaluatorConfig
+	userId  uint
+	model   model.ToolCallingChatModel
+	config  *EvaluatorConfig
+	options []model.Option
 }
 
 // NewEvaluator 创建评分器
@@ -31,9 +33,10 @@ func NewEvaluator(ctx context.Context, userId uint, config *EvaluatorConfig) (*E
 	}
 
 	return &Evaluator{
-		userId: userId,
-		model:  m,
-		config: config,
+		userId:  userId,
+		model:   m,
+		config:  config,
+		options: llm.ScoringOptions(),
 	}, nil
 }
 
@@ -56,7 +59,20 @@ func (e *Evaluator) Evaluate(ctx context.Context, req *EvaluationRequest) (*Eval
 		schema.UserMessage(prompt),
 	}
 
-	response, err := e.model.Generate(ctx, messages)
+	timeout, maxTokens := 30*time.Second, 2048
+	if e.config != nil {
+		if e.config.Timeout > 0 {
+			timeout = e.config.Timeout
+		}
+		if e.config.MaxTokens > 0 {
+			maxTokens = e.config.MaxTokens
+		}
+	}
+	evaluationCtx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+	options := append([]model.Option{}, e.options...)
+	options = append(options, model.WithMaxTokens(maxTokens))
+	response, err := e.model.Generate(evaluationCtx, messages, options...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate evaluation: %w", err)
 	}

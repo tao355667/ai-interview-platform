@@ -1,0 +1,21 @@
+{
+  "counts": {
+    "pass": 78,
+    "skip": 3
+  },
+  "packages": {
+    "interview-agents/pkg/circuitbreaker": "pass",
+    "interview-agents/pkg/eino/callbacks": "pass",
+    "interview-agents/internal/payment/webhook": "pass",
+    "interview-agents/internal/payment/providers/stripe": "pass",
+    "interview-agents/internal/payment/providers/paypal": "pass",
+    "interview-agents/api/router/middleware": "pass",
+    "interview-agents/api/handler/interview": "pass",
+    "interview-agents/pkg/ratelimiter": "pass",
+    "interview-agents/internal/service/interview/asr": "pass"
+  },
+  "go_version": "go1.25.1",
+  "scope": "nine selected relevant packages; real Redis tested separately by harness; three legacy Redis integration tests skipped",
+  "race_check": "go test -race ./pkg/ratelimiter -count=1: pass",
+  "vet_check": "go vet ./scripts/benchmark ./pkg/ratelimiter: pass"
+}

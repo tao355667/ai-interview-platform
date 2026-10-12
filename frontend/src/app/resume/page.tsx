@@ -2,44 +2,50 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 
-import {
-  Typography,
-  Row,
-  Col,
-  Card as AntCard,
-  Form,
-  Select,
-  Input,
-  Button,
-  message,
-  Modal,
-} from 'antd';
-import {
-  FileTextOutlined,
-  RocketOutlined,
-  ThunderboltOutlined,
-  ReadOutlined,
-  CheckCircleOutlined,
-} from '@ant-design/icons';
+import { Form, Select, Input, Button, message, Modal, Steps } from 'antd';
+import { BookOpenText, FileSearch, History, Network, Zap } from 'lucide-react';
 import apiClient from '@/services/api/client';
 import { RESUME_API, PREDICTION_API } from '@/config/api';
-
-const { Title, Paragraph, Text } = Typography;
+import PageHeader from '@/components/common/PageHeader';
+import GeneratingProgress from '@/components/prediction/GeneratingProgress';
 
 interface Resume {
   id: number;
   file_name: string;
 }
 
+const FEATURES = [
+  {
+    title: '定位考点',
+    desc: '逐条解析简历中的项目和技能，生成对应的问答清单。',
+    icon: <FileSearch className="h-[1em] w-[1em] shrink-0" aria-hidden="true" />,
+  },
+  {
+    title: '梳理追问',
+    desc: '结合岗位要求和项目经历，给出面试官可能的追问路径。',
+    icon: <Network className="h-[1em] w-[1em] shrink-0" aria-hidden="true" />,
+  },
+  {
+    title: '对照学习',
+    desc: '每道题附带考察重点、答题思路和参考答案。',
+    icon: <BookOpenText className="h-[1em] w-[1em] shrink-0" aria-hidden="true" />,
+  },
+];
+
 export default function ResumePressPage() {
-  
-  
   const [form] = Form.useForm();
   const [loading, setLoading] = useState(false);
   const [resumes, setResumes] = useState<Resume[]>([]);
   const [showNoResumeModal, setShowNoResumeModal] = useState(false);
   const router = useRouter();
+
+  const resumeId = Form.useWatch('resume_id', form);
+  const job = Form.useWatch('job', form);
+  const companyName = Form.useWatch('company_name', form);
+
+  const currentStep = loading ? 2 : !resumeId ? 0 : !job || !companyName ? 1 : 2;
 
   useEffect(() => {
     const fetchResumes = async () => {
@@ -48,7 +54,7 @@ export default function ResumePressPage() {
         if (data && data.resumes) {
           setResumes(data.resumes);
           if (data.resumes.length > 0) {
-            // Check if default exists or pick first
+            // 优先选中默认简历，否则选第一份
             const defaultResume = data.resumes.find((r: any) => r.is_default) || data.resumes[0];
             form.setFieldsValue({ resume_id: defaultResume.id });
           } else {
@@ -59,7 +65,6 @@ export default function ResumePressPage() {
         }
       } catch (e) {
         console.error('Failed to fetch resumes:', e);
-        // message.error('获取简历列表失败'); // Optional: avoid spamming error on load
       }
     };
     fetchResumes();
@@ -80,239 +85,222 @@ export default function ResumePressPage() {
       await apiClient.post(PREDICTION_API.START, payload, {
         timeout: 180000, // 3 分钟超时
       });
-      message.success("Started generating...");
+      message.success('押题已生成');
       router.push('/user/press');
     } catch (e: any) {
-      message.error(e?.message || "Submission failed, please try again");
+      message.error(e?.message || '提交失败，请重试');
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="min-h-screen relative font-sans pb-12">
-      {/* Decorative Background */}
-      <div className="fixed top-0 right-0 w-[600px] h-[600px] bg-indigo-50/60 rounded-full blur-[120px] -translate-y-1/2 translate-x-1/3 pointer-events-none z-0" />
-      <div className="fixed bottom-0 left-0 w-[600px] h-[600px] bg-purple-50/60 rounded-full blur-[120px] translate-y-1/2 -translate-x-1/3 pointer-events-none z-0" />
+    <div className="page py-10">
+      <PageHeader
+        title="简历押题"
+        description="根据你的简历和求职意向，预测面试中可能被问到的问题。"
+        actions={
+          <Link href="/user/press">
+            <Button icon={<History className="h-4 w-4" aria-hidden="true" />}>押题记录</Button>
+          </Link>
+        }
+      />
 
-      <div className="container mx-auto px-4 relative z-10">
-        <div className="mb-10 animate-fade-in-up pt-8">
-          <h1 className="text-3xl font-extrabold text-slate-900 tracking-tight flex items-center gap-3">
-            <RocketOutlined className="text-indigo-600" />
-            {"Resume Prediction"}
-          </h1>
-          <p className="text-slate-500 mt-2 ml-11 max-w-2xl">
-            {"Predict interview questions based on your resume and job intention, helping you prepare with precision."}
-          </p>
-        </div>
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+        <div className="surface p-6 lg:col-span-2">
+          <Steps
+            size="small"
+            current={currentStep}
+            className="mb-8"
+            items={[{ title: '选择简历' }, { title: '填写目标岗位' }, { title: '生成押题' }]}
+          />
 
-        <Row gutter={[32, 32]} className="animate-fade-in-up" style={{ animationDelay: '0.1s' }}>
-          <Col xs={24} lg={16}>
-            <AntCard
-              className="rounded-3xl border-slate-100 shadow-xl shadow-slate-200/50 overflow-hidden"
-              styles={{ body: { padding: 40 } }}
-            >
-              <div className="bg-indigo-50/50 rounded-2xl p-5 mb-8 border border-indigo-100 flex items-start gap-3">
-                <CheckCircleOutlined className="text-indigo-600 mt-1" />
-                <div className="text-sm text-indigo-900">
-                  <div className="font-bold mb-1">{"Friendly Reminder"}</div>
-                  <ul className="list-disc pl-4 space-y-1 text-indigo-800/80">
-                    <li>{"Predictions will be generated based on your resume, providing at least 20 questions."}</li>
-                    <li>{"Changing resume content will affect predictions, history will be kept."}</li>
-                  </ul>
-                </div>
-              </div>
-
-              <Form
-                form={form}
-                layout="vertical"
-                onFinish={onFinish}
-                initialValues={{
-                  language: 'Java',
-                  job: "Java Backend Developer",
-                  level: '进阶',
-                  prediction_type: '校招',
-                }}
-                className="flex flex-col gap-4"
+          <Form
+            form={form}
+            layout="vertical"
+            onFinish={onFinish}
+            disabled={loading}
+            requiredMark={false}
+            initialValues={{
+              language: 'Java',
+              job: 'Java 后端开发',
+              level: '进阶',
+              prediction_type: '校招',
+            }}
+          >
+            <section>
+              <h2 className="mb-4 text-base font-semibold text-ink">
+                <span className="mr-2 tabular-nums text-brand-800">1</span>
+                选择简历
+              </h2>
+              <Form.Item
+                label="押题使用的简历"
+                name="resume_id"
+                rules={[{ required: true, message: '请选择简历' }]}
+                extra={
+                  <span>
+                    没有合适的简历？
+                    <Link
+                      href="/user/center"
+                      className="text-brand-800 underline-offset-2 hover:underline"
+                    >
+                      去个人中心上传
+                    </Link>
+                  </span>
+                }
               >
+                <Select
+                  options={resumes.map((r) => ({ value: r.id, label: r.file_name }))}
+                  placeholder={resumes.length === 0 ? '加载中...' : '请选择简历'}
+                  popupMatchSelectWidth={false}
+                />
+              </Form.Item>
+            </section>
+
+            <section className="mt-2 border-t border-line pt-6">
+              <h2 className="mb-4 text-base font-semibold text-ink">
+                <span className="mr-2 tabular-nums text-brand-800">2</span>
+                填写目标岗位
+              </h2>
+              <div className="grid grid-cols-1 gap-x-4 md:grid-cols-2">
                 <Form.Item
-                  label={<span className="font-bold text-slate-700">{"Select Resume"}</span>}
-                  name="resume_id"
-                  rules={[{ required: true, message: "Please select a resume" }]}
+                  label="岗位意向"
+                  name="job"
+                  rules={[{ required: true, message: '请填写岗位意向，如：Java 后端开发' }]}
                 >
-                  <Select
-                    size="large"
-                    variant="filled"
-                    className="!h-12"
-                    options={resumes.map((r) => ({ value: r.id, label: r.file_name }))}
-                    placeholder={resumes.length === 0 ? "Loading..." : "Please select a resume"}
-                    popupMatchSelectWidth={false}
-                  />
+                  <Input placeholder="如：Java 后端开发" />
                 </Form.Item>
 
                 <Form.Item
-                  label={<span className="font-bold text-slate-700">{"Interview Type"}</span>}
+                  label="目标公司"
+                  name="company_name"
+                  rules={[{ required: true, message: '请填写目标公司，如：字节跳动' }]}
+                >
+                  <Input placeholder="如：字节跳动" />
+                </Form.Item>
+
+                <Form.Item
+                  label="面试类型"
                   name="prediction_type"
-                  rules={[{ required: true, message: "Select interview type" }]}
+                  rules={[{ required: true, message: '请选择面试类型' }]}
                 >
                   <Select
-                    size="large"
-                    variant="filled"
-                    className="!h-12"
                     options={[
-                      { value: '校招', label: "Campus" },
-                      { value: '社招', label: "Experienced" },
+                      { value: '校招', label: '校招' },
+                      { value: '社招', label: '社招' },
                     ]}
                   />
                 </Form.Item>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <Form.Item
-                    label={<span className="font-bold text-slate-700">{"Programming Language"}</span>}
-                    name="language"
-                    rules={[{ required: true, message: "Select language" }]}
-                  >
-                    <Select
-                      size="large"
-                      variant="filled"
-                      className="!h-12"
-                      options={[
-                        { value: 'Java', label: 'Java' },
-                        { value: 'Golang', label: 'Golang' },
-                        { value: 'Python', label: 'Python' },
-                        { value: 'C++', label: 'C++' },
-                        { value: 'Frontend', label: "Frontend (JS/TS)" },
-                      ]}
-                    />
-                  </Form.Item>
-
-                  <Form.Item
-                    label={<span className="font-bold text-slate-700">{"Job Intention"}</span>}
-                    name="job"
-                    rules={[{ required: true, message: "e.g., Java Backend Developer" }]}
-                  >
-                    <Input
-                      size="large"
-                      variant="filled"
-                      className="!h-12 !bg-slate-50 hover:!bg-slate-100 focus:!bg-white border-transparent hover:border-indigo-300 focus:border-indigo-500"
-                      placeholder={"e.g., Java Backend Developer"}
-                    />
-                  </Form.Item>
-
-                  <Form.Item
-                    label={<span className="font-bold text-slate-700">{"Difficulty Level"}</span>}
-                    name="level"
-                    rules={[{ required: true, message: "Select difficulty" }]}
-                  >
-                    <Select
-                      size="large"
-                      variant="filled"
-                      className="!h-12"
-                      options={[
-                        { value: '入门', label: "Junior" },
-                        { value: '中级', label: "Intermediate" },
-                        { value: '进阶', label: "Advanced" },
-                        { value: '专家', label: "Expert" },
-                      ]}
-                    />
-                  </Form.Item>
-
-                  <Form.Item
-                    label={<span className="font-bold text-slate-700">{"Target Company"}</span>}
-                    name="company_name"
-                    rules={[{ required: true, message: "e.g., ByteDance" }]}
-                  >
-                    <Input
-                      size="large"
-                      variant="filled"
-                      className="!h-12 !bg-slate-50 hover:!bg-slate-100 focus:!bg-white border-transparent hover:border-indigo-300 focus:border-indigo-500"
-                      placeholder={"e.g., ByteDance"}
-                    />
-                  </Form.Item>
-                </div>
-
-                <div className="mt-8 pt-6 border-t border-slate-100">
-                  <Button
-                    type="primary"
-                    htmlType="submit"
-                    loading={loading}
-                    size="large"
-                    icon={<ThunderboltOutlined />}
-                    className="w-full h-14 text-lg font-bold rounded-xl bg-indigo-600 hover:bg-indigo-500 shadow-lg shadow-indigo-200"
-                  >
-                    {"Start Prediction"}
-                  </Button>
-                  <div className="text-center text-slate-400 text-sm mt-4">
-                    {"First free prediction with 5 questions · Takes about 60 seconds"}
-                  </div>
-                </div>
-              </Form>
-            </AntCard>
-          </Col>
-
-          <Col xs={24} lg={8}>
-            <div className="flex flex-col gap-6 sticky top-8">
-              {[
-                {
-                  title: "Quick Positioning",
-                  desc: "Deeply analyze resume items, generate corresponding Q&A list.",
-                  icon: <FileTextOutlined className="text-2xl text-blue-500" />,
-                  bg: 'bg-blue-50',
-                  border: 'border-blue-100',
-                },
-                {
-                  title: "Quick Analysis",
-                  desc: "Combine job requirements and project experience for follow-up paths.",
-                  icon: <ThunderboltOutlined className="text-2xl text-amber-500" />,
-                  bg: 'bg-amber-50',
-                  border: 'border-amber-100',
-                },
-                {
-                  title: "Direct Learning",
-                  desc: "Paired with reference answers and extended reading.",
-                  icon: <ReadOutlined className="text-2xl text-emerald-500" />,
-                  bg: 'bg-emerald-50',
-                  border: 'border-emerald-100',
-                },
-              ].map((item, idx) => (
-                <div
-                  key={idx}
-                  className="bg-white p-6 rounded-2xl border border-slate-100 shadow-lg shadow-slate-100/50 hover:-translate-y-1 transition-all duration-300"
+                <Form.Item
+                  label="编程语言"
+                  name="language"
+                  rules={[{ required: true, message: '请选择编程语言' }]}
                 >
-                  <div
-                    className={`w-12 h-12 ${item.bg} rounded-xl flex items-center justify-center mb-4 border ${item.border}`}
-                  >
+                  <Select
+                    options={[
+                      { value: 'Java', label: 'Java' },
+                      { value: 'Golang', label: 'Golang' },
+                      { value: 'Python', label: 'Python' },
+                      { value: 'C++', label: 'C++' },
+                      { value: 'Frontend', label: '前端（JS/TS）' },
+                    ]}
+                  />
+                </Form.Item>
+
+                <Form.Item
+                  label="难度等级"
+                  name="level"
+                  rules={[{ required: true, message: '请选择难度等级' }]}
+                >
+                  <Select
+                    options={[
+                      { value: '入门', label: '入门' },
+                      { value: '中级', label: '中级' },
+                      { value: '进阶', label: '进阶' },
+                      { value: '专家', label: '专家' },
+                    ]}
+                  />
+                </Form.Item>
+              </div>
+            </section>
+
+            <section className="mt-2 border-t border-line pt-6">
+              <h2 className="mb-4 text-base font-semibold text-ink">
+                <span className="mr-2 tabular-nums text-brand-800">3</span>
+                生成押题
+              </h2>
+
+              {loading ? (
+                <GeneratingProgress active={loading} />
+              ) : (
+                <p className="mb-4 text-sm text-ink-secondary">
+                  确认信息无误后开始生成，每次不少于 20 道题，约需 1 分钟。
+                </p>
+              )}
+
+              <Button
+                type="primary"
+                htmlType="submit"
+                size="large"
+                loading={loading}
+                // 表单在生成时整体禁用，按钮单独保持可见的 loading 状态
+                disabled={false}
+                icon={<Zap className="h-4 w-4" aria-hidden="true" />}
+                className={`w-full sm:w-auto ${loading ? 'mt-4' : ''}`}
+              >
+                {loading ? '正在生成' : '开始押题'}
+              </Button>
+            </section>
+          </Form>
+        </div>
+
+        <aside className="flex flex-col gap-4 lg:sticky lg:top-20 lg:self-start">
+          <div className="surface p-5">
+            <h3 className="mb-4 text-base font-semibold text-ink">押题能帮你做什么</h3>
+            <ul className="flex flex-col gap-4">
+              {FEATURES.map((item) => (
+                <li key={item.title} className="flex items-start gap-3">
+                  <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-brand-50 text-base text-brand-800">
                     {item.icon}
+                  </span>
+                  <div>
+                    <div className="text-sm font-medium text-ink">{item.title}</div>
+                    <p className="mt-0.5 text-sm leading-6 text-ink-secondary">{item.desc}</p>
                   </div>
-                  <h3 className="text-lg font-bold text-slate-800 mb-2">{item.title}</h3>
-                  <p className="text-slate-500 leading-relaxed m-0">{item.desc}</p>
-                </div>
+                </li>
               ))}
-            </div>
-          </Col>
-        </Row>
+            </ul>
+          </div>
+
+          <div className="surface p-5">
+            <h3 className="mb-3 text-base font-semibold text-ink">使用提示</h3>
+            <ul className="list-disc space-y-2 pl-5 text-sm leading-6 text-ink-secondary">
+              <li>题目根据简历内容生成，每次至少 20 道。</li>
+              <li>切换或更新简历会改变押题范围，历史押题会保留。</li>
+              <li>岗位和公司写得越具体，题目越贴近真实面试。</li>
+            </ul>
+          </div>
+        </aside>
       </div>
+
       <Modal
         open={showNoResumeModal}
-        title={"Friendly Reminder"}
-        footer={null}
+        title="还没有简历"
         onCancel={() => setShowNoResumeModal(false)}
         centered
+        footer={[
+          <Button key="cancel" onClick={() => setShowNoResumeModal(false)}>
+            稍后再说
+          </Button>,
+          <Button key="upload" type="primary" onClick={() => router.push('/user/center')}>
+            去上传简历
+          </Button>,
+        ]}
       >
-        <div className="text-center py-6">
-          <div className="mb-4 text-slate-600 text-lg">{"No resume detected, cannot start interview."}</div>
-          <div className="mb-8 text-slate-500">
-            {"Please go to personal center to upload your resume, AI will generate questions based on it."}
-          </div>
-          <Button
-            type="primary"
-            size="large"
-            onClick={() => router.push('/user/center')}
-            className="w-full bg-indigo-600 hover:bg-indigo-500"
-          >
-            {"Go to Upload Resume"}
-          </Button>
-        </div>
+        <p className="text-sm leading-6 text-ink-secondary">
+          押题需要基于简历生成。请先到个人中心上传简历，AI 会根据简历内容生成针对性的面试题。
+        </p>
       </Modal>
     </div>
   );

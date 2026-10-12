@@ -1,275 +1,66 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { Card as AntCard, Row, Col, Tag, Button, Avatar, Spin, message, Divider } from 'antd';
+import { useEffect, useState, type ReactNode } from 'react';
+import { Button, Empty, Progress, Skeleton, message } from 'antd';
 import { useParams } from 'next/navigation';
+import Link from 'next/link';
+import { ArrowLeft, Bot, Download } from 'lucide-react';
 import apiClient from '@/services/api/client';
 import { useAuth } from '@/hooks/useAuth';
 import { USER_API, INTERVIEW_API } from '@/config/api';
+import { colors } from '@/theme/tokens';
+import PageHeader from '@/components/common/PageHeader';
+import ExpandableText from '@/components/records/ExpandableText';
+import InterviewTypeTag from '@/components/records/InterviewTypeTag';
 import {
-  TrophyOutlined,
-  ClockCircleOutlined,
-  CalendarOutlined,
-  EnvironmentOutlined,
-  UserOutlined,
-  BarChartOutlined,
-  DownloadOutlined,
-  RobotOutlined,
-  CheckCircleOutlined,
-  BulbOutlined,
-} from '@ant-design/icons';
+  difficultyLabel,
+  formatDateTime,
+  formatDuration,
+  scoreLevel,
+  SCORE_LEVEL_LABEL,
+  SCORE_TEXT_CLASS,
+  type ScoreLevel,
+} from '@/components/records/recordMeta';
 
-const difficultyMap: Record<string, string> = {
-  easy: 'Easy',
-  medium: 'Medium',
-  hard: 'Hard',
-  '\u7b80\u5355': 'Easy',
-  '\u4e2d\u7b49': 'Medium',
-  '\u56f0\u96be': 'Hard',
+const SCORE_STROKE: Record<ScoreLevel, string> = {
+  success: colors.success,
+  warning: colors.warning,
+  danger: colors.danger,
 };
 
-const interviewTypeMap: Record<string, string> = {
-  technical: 'Technical',
-  hr: 'HR',
-  behavioral: 'Behavioral',
-  '\u7efc\u5408': 'General',
-  '\u6280\u672f\u9762': 'Technical',
-  '\u884c\u4e3a\u9762': 'Behavioral',
-  'hr\u9762': 'HR',
-};
+const BackLink = () => (
+  <Link
+    href="/user/interviews"
+    className="inline-flex items-center gap-1 text-ink-secondary transition-colors duration-150 hover:text-brand-800"
+  >
+    <ArrowLeft className="h-[1em] w-[1em] shrink-0" aria-hidden="true" />
+    返回面试记录
+  </Link>
+);
 
-const dimensionNameMap: Record<string, string> = {
-  '\u6c9f\u901a\u8868\u8fbe': 'Communication',
-  '\u903b\u8f91\u601d\u7ef4': 'Logical Thinking',
-  '\u6280\u672f\u6df1\u5ea6': 'Technical Depth',
-  '\u4e1a\u52a1\u7406\u89e3': 'Business Understanding',
-  '\u5b66\u4e60\u80fd\u529b': 'Learning Agility',
-  '\u95ee\u9898\u89e3\u51b3': 'Problem Solving',
-  '\u56e2\u961f\u534f\u4f5c': 'Team Collaboration',
-};
-
-const toEnglishLabel = (value: string | undefined, mapping: Record<string, string>) => {
-  if (!value) return 'Unknown';
-  return mapping[value] || value;
-};
-
-const formatDuration = (totalSeconds: number | undefined) => {
-  if (!totalSeconds && totalSeconds !== 0) return 'Unknown';
-  const minutes = Math.floor(totalSeconds / 60);
-  const seconds = totalSeconds % 60;
-  return `${minutes}m ${seconds}s`;
-};
-
-const shortDimensionName = (name: string) => {
-  const translated = dimensionNameMap[name] || name;
-  return translated.length > 18 ? `${translated.slice(0, 15)}...` : translated;
-};
-
-function ExpandableMobileText({
-  content,
-  textClassName,
-  lines = 3,
-  threshold = 120,
+function Section({
+  title,
+  extra,
+  children,
 }: {
-  content: unknown;
-  textClassName?: string;
-  lines?: number;
-  threshold?: number;
+  title: string;
+  extra?: ReactNode;
+  children: ReactNode;
 }) {
-  const [expanded, setExpanded] = useState(false);
-  const value = content == null ? '' : String(content);
-
-  if (!value) return null;
-
-  const shouldClamp = value.length > threshold;
-  const clampClassByLines: Record<number, string> = {
-    2: '[-webkit-line-clamp:2]',
-    3: '[-webkit-line-clamp:3]',
-    4: '[-webkit-line-clamp:4]',
-    5: '[-webkit-line-clamp:5]',
-  };
-  const clampClass = clampClassByLines[lines] || clampClassByLines[3];
-
   return (
-    <div className="min-w-0">
-      <div
-        className={[
-          textClassName || '',
-          'break-words [overflow-wrap:anywhere]',
-          !expanded && shouldClamp
-            ? `overflow-hidden [display:-webkit-box] [-webkit-box-orient:vertical] ${clampClass} sm:overflow-visible sm:[display:block] sm:[-webkit-line-clamp:unset]`
-            : '',
-        ]
-          .filter(Boolean)
-          .join(' ')}
-      >
-        {value}
+    <section className="surface p-5 sm:p-6">
+      <div className="mb-4 flex items-center justify-between gap-4">
+        <h2 className="text-lg font-semibold text-ink">{title}</h2>
+        {extra}
       </div>
-      {shouldClamp && (
-        <button
-          type="button"
-          onClick={() => setExpanded((prev) => !prev)}
-          className="mt-2 text-xs font-medium text-blue-600 hover:text-blue-500 sm:hidden"
-        >
-          {expanded ? 'Show less' : 'Show more'}
-        </button>
-      )}
-    </div>
+      {children}
+    </section>
   );
 }
 
-function RadarChart({
-  items,
-  size = 520,
-}: {
-  items: { dimension_name: string; score: number }[];
-  size?: number;
-}) {
-  const radius = size * 0.35; // Use 35% of size for radius to leave room for labels
-  const cx = size / 2;
-  const cy = size / 2;
-  const points = items.map((it, i) => {
-    const angle = (2 * Math.PI * i) / items.length - Math.PI / 2;
-    const r = (Math.max(0, Math.min(100, Number(it.score))) / 100) * radius;
-    return [cx + r * Math.cos(angle), cy + r * Math.sin(angle)];
-  });
-  const axis = items.map((_, i) => {
-    const angle = (2 * Math.PI * i) / items.length - Math.PI / 2;
-    return [cx + radius * Math.cos(angle), cy + radius * Math.sin(angle)];
-  });
-  const poly = points.map((p) => p.join(',')).join(' ');
-
-  return (
-    <div
-      style={{ width: '100%', maxWidth: size, height: size }}
-      className="mx-auto relative min-w-0"
-    >
-      <svg
-        width="100%"
-        height="100%"
-        viewBox={`0 0 ${size} ${size}`}
-        style={{ overflow: 'visible' }}
-      >
-        <defs>
-          <radialGradient id="radarGradient" cx="50%" cy="50%" r="50%" fx="50%" fy="50%">
-            <stop offset="0%" stopColor="rgba(82,196,26,0.4)" />
-            <stop offset="100%" stopColor="rgba(82,196,26,0.1)" />
-          </radialGradient>
-        </defs>
-        {/* Background circles */}
-        {[1, 0.8, 0.6, 0.4, 0.2].map((scale, i) => (
-          <circle
-            key={i}
-            cx={cx}
-            cy={cy}
-            r={radius * scale}
-            fill={i === 0 ? '#f6ffed' : 'none'}
-            stroke="#d9f7be"
-            strokeDasharray={i === 0 ? 'none' : '4 4'}
-          />
-        ))}
-
-        {/* Axis lines */}
-        {axis.map((p, i) => (
-          <line key={i} x1={cx} y1={cy} x2={p[0]} y2={p[1]} stroke="#e8e8e8" />
-        ))}
-
-        {/* Data polygon */}
-        <polygon points={poly} fill="url(#radarGradient)" stroke="#52c41a" strokeWidth={2} />
-
-        {/* Data points */}
-        {points.map((p, i) => (
-          <circle key={i} cx={p[0]} cy={p[1]} r={4} fill="#fff" stroke="#52c41a" strokeWidth={2} />
-        ))}
-
-        {/* Labels */}
-        {axis.map((p, i) => {
-          // Calculate offset based on angle to push labels away from center
-          const angle = (2 * Math.PI * i) / items.length - Math.PI / 2;
-          const labelDist = 14; // Distance from the end of the axis
-          const lx = p[0] + labelDist * Math.cos(angle);
-          const ly = p[1] + labelDist * Math.sin(angle);
-
-          // Determine text anchor based on x position relative to center
-          let textAnchor = 'middle';
-          if (Math.abs(lx - cx) > 10) {
-            textAnchor = lx > cx ? 'start' : 'end';
-          }
-
-          // Determine dominant baseline based on y position
-          let dominantBaseline = 'middle';
-          if (Math.abs(ly - cy) > 10) {
-            dominantBaseline = ly > cy ? 'hanging' : 'baseline';
-          }
-
-          return (
-            <text
-              key={i}
-              x={lx}
-              y={ly}
-              textAnchor={textAnchor}
-              dominantBaseline={dominantBaseline}
-              fontSize={11}
-              fontWeight={600}
-              fill="#64748b"
-            >
-              {shortDimensionName(items[i].dimension_name)}
-            </text>
-          );
-        })}
-      </svg>
-    </div>
-  );
-}
-
-function ScoreGauge({ score }: { score: number }) {
-  const size = 260;
-  const cx = size / 2;
-  const cy = size / 2;
-  const r = 100;
-  const start = Math.PI;
-  const angle = (Math.max(0, Math.min(100, score)) / 100) * Math.PI;
-  const arcPath = (ang: number, color: string) => {
-    const sx = cx + r * Math.cos(start);
-    const sy = cy + r * Math.sin(start);
-    const ex = cx + r * Math.cos(start + ang);
-    const ey = cy + r * Math.sin(start + ang);
-    return (
-      <path
-        d={`M ${sx} ${sy} A ${r} ${r} 0 0 1 ${ex} ${ey}`}
-        stroke={color}
-        strokeWidth={14}
-        fill="none"
-        strokeLinecap="round"
-      />
-    );
-  };
-
-  let color = '#52c41a'; // Green for good
-  if (score < 60)
-    color = '#ff4d4f'; // Red for bad
-  else if (score < 80) color = '#faad14'; // Yellow for average
-
-  return (
-    <div style={{ width: size, height: size / 1.4 }} className="mx-auto relative">
-      <svg width={size} height={size / 1.4}>
-        <path
-          d={`M ${cx - r} ${cy} A ${r} ${r} 0 0 1 ${cx + r} ${cy}`}
-          stroke="#f0f0f0"
-          strokeWidth={14}
-          fill="none"
-          strokeLinecap="round"
-        />
-        {arcPath(angle, color)}
-        <text x={cx} y={cy - 15} textAnchor="middle" fontSize={14} fill="#8c8c8c">
-          Interview Score
-        </text>
-        <text x={cx} y={cy + 30} textAnchor="middle" fontSize={48} fontWeight={700} fill={color}>
-          {score}
-        </text>
-      </svg>
-    </div>
-  );
+function toScore(value: unknown): number | null {
+  const n = Number(value);
+  return value != null && value !== '' && Number.isFinite(n) ? n : null;
 }
 
 export default function InterviewResultDetailPage() {
@@ -330,7 +121,7 @@ export default function InterviewResultDetailPage() {
       }
     } catch (e: any) {
       console.error(e);
-      message.error('Failed to load interview details');
+      message.error('评估报告加载失败，请稍后重试');
     } finally {
       setLoading(false);
     }
@@ -343,399 +134,307 @@ export default function InterviewResultDetailPage() {
 
   if (loading) {
     return (
-      <div className="flex justify-center items-center min-h-screen bg-slate-50">
-        <Spin size="large" tip="Generating detailed analysis..." />
+      <div className="page py-10">
+        <PageHeader title="评估报告" extra={<BackLink />} />
+        <div className="space-y-4">
+          <div className="surface p-6">
+            <Skeleton active paragraph={{ rows: 3 }} />
+          </div>
+          <div className="surface p-6">
+            <Skeleton active paragraph={{ rows: 5 }} />
+          </div>
+        </div>
       </div>
     );
   }
 
   if (!evaluation) {
     return (
-      <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
-        <AntCard className="rounded-3xl shadow-xl border-0 text-center p-10 max-w-md w-full">
-          <div className="mb-4 text-6xl">📊</div>
-          <h3 className="text-xl font-bold text-slate-700 mb-2">No analysis report yet</h3>
-          <p className="text-slate-500 mb-6">
-            The interview may still be in progress, or data is processing.
-          </p>
-          <Button
-            type="primary"
-            onClick={() => window.history.back()}
-            className="bg-blue-600 rounded-xl h-10 px-6"
+      <div className="page py-10">
+        <PageHeader title="评估报告" extra={<BackLink />} />
+        <div className="surface px-6 py-12">
+          <Empty
+            description={
+              <div className="space-y-1">
+                <div className="text-base font-medium text-ink">暂无评估报告</div>
+                <div className="text-ink-secondary">
+                  面试可能仍在进行中，或报告正在生成，请稍后再来查看
+                </div>
+              </div>
+            }
           >
-            Back to list
-          </Button>
-        </AntCard>
+            <Link
+              href="/user/interviews"
+              className="inline-flex h-9 items-center rounded bg-brand-600 px-4 text-sm font-medium text-white transition-colors duration-150 hover:bg-brand-700 hover:text-white"
+            >
+              返回面试记录
+            </Link>
+          </Empty>
+        </div>
       </div>
     );
   }
 
-  const basic = {
-    candidate: user?.name || 'Unknown User',
-    resume: 'N/A',
-    type: toEnglishLabel(interviewInfo?.type, interviewTypeMap),
-    score: evaluation.score,
-    difficulty: toEnglishLabel(interviewInfo?.difficulty, difficultyMap),
-    company: interviewInfo?.company_name || 'Not specified',
-    position: interviewInfo?.position_name || 'Not specified',
-    duration: formatDuration(interviewInfo?.duration),
-    time: interviewInfo?.created_at
-      ? new Date(interviewInfo.created_at).toLocaleString('en-US')
-      : 'Unknown',
-  };
+  const score = toScore(evaluation.score);
+  const level = score != null ? scoreLevel(score) : null;
+  const dimensions: any[] = evaluation.dimensions || [];
+
+  const infoItems: { label: string; value: ReactNode }[] = [
+    { label: '候选人', value: user?.name || '未知用户' },
+    { label: '公司', value: interviewInfo?.company_name || '未填写' },
+    { label: '岗位', value: interviewInfo?.position_name || '未填写' },
+    { label: '难度', value: difficultyLabel(interviewInfo?.difficulty) || '未知' },
+    { label: '用时', value: formatDuration(interviewInfo?.duration) || '未知' },
+    { label: '面试时间', value: formatDateTime(interviewInfo?.created_at) || '未知' },
+  ];
 
   return (
-    <div className="min-h-screen relative font-sans bg-slate-50/50 pb-20">
-      {/* Decorative Background */}
-      <div className="fixed top-0 left-0 w-full h-[400px] bg-gradient-to-b from-blue-50/80 to-transparent pointer-events-none z-0" />
-      <div className="fixed top-0 right-0 w-[600px] h-[600px] bg-indigo-50/60 rounded-full blur-[120px] -translate-y-1/2 translate-x-1/3 pointer-events-none z-0" />
+    <div className="page py-10">
+      <PageHeader
+        title="评估报告"
+        description="回顾本场面试表现，查看各维度得分与逐题点评"
+        extra={<BackLink />}
+        actions={
+          <>
+            <Button icon={<Download className="h-4 w-4" aria-hidden="true" />}>下载报告</Button>
+            <Button icon={<Bot className="h-4 w-4" aria-hidden="true" />}>AI 改进建议</Button>
+          </>
+        }
+      />
 
-      <div className="container mx-auto px-4 relative z-10 pt-8">
-        <div className="mb-8 animate-fade-in-up flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-extrabold text-slate-900 tracking-tight flex items-center gap-3 break-words [overflow-wrap:anywhere]">
-              <TrophyOutlined className="text-yellow-500" />
-              Interview Results Analysis
-            </h1>
-            <p className="text-slate-500 mt-2 ml-11 break-words [overflow-wrap:anywhere]">
-              A full review of your interview performance, powered by AI insights.
-            </p>
+      <div className="space-y-4">
+        {/* 概览：总分 + 基本信息 */}
+        <section className="surface grid gap-6 p-5 sm:p-6 md:grid-cols-[220px_1fr] md:gap-8">
+          <div className="border-line md:border-r md:pr-8">
+            <div className="text-sm text-ink-secondary">综合得分</div>
+            <div className="mt-1 flex items-baseline gap-1">
+              <span
+                className={`text-[32px] font-semibold leading-tight tabular-nums ${
+                  level ? SCORE_TEXT_CLASS[level] : 'text-ink'
+                }`}
+              >
+                {score ?? '–'}
+              </span>
+              <span className="text-sm text-ink-secondary">/ 100</span>
+            </div>
+            {level && (
+              <div className={`mt-1 text-sm font-medium ${SCORE_TEXT_CLASS[level]}`}>
+                {SCORE_LEVEL_LABEL[level]}
+              </div>
+            )}
+            {score != null && (
+              <Progress
+                className="mt-3"
+                percent={Math.max(0, Math.min(100, score))}
+                showInfo={false}
+                strokeColor={level ? SCORE_STROKE[level] : undefined}
+                size="small"
+              />
+            )}
           </div>
-          <Button
-            onClick={() => window.history.back()}
-            className="rounded-xl border-slate-200 hover:border-blue-400 hover:text-blue-600"
-          >
-            Back to list
-          </Button>
-        </div>
 
-        {/* Header Info Card */}
-        <div className="bg-white rounded-3xl p-8 border border-slate-100 shadow-xl shadow-slate-200/50 animate-fade-in-up mb-8">
-          <Row gutter={[48, 24]} align="middle">
-            <Col xs={24} lg={14}>
-              <div className="flex items-start gap-6 min-w-0">
-                <Avatar
-                  size={80}
-                  className="bg-blue-100 text-blue-600 font-bold text-2xl border-4 border-white shadow-lg"
-                >
-                  {basic.candidate.substring(0, 2).toUpperCase()}
-                </Avatar>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-3 mb-2 min-w-0">
-                    <h2 className="text-2xl font-bold text-slate-800 m-0 break-words [overflow-wrap:anywhere]">
-                      {basic.candidate}
-                    </h2>
-                    <Tag
-                      color="blue"
-                      className="rounded-full px-3 border-0 bg-blue-50 text-blue-700 font-medium max-w-full break-words [overflow-wrap:anywhere]"
-                    >
-                      {basic.type}
-                    </Tag>
-                  </div>
+          <div className="min-w-0">
+            <div className="mb-3">
+              <InterviewTypeTag type={interviewInfo?.type} domain={interviewInfo?.domain} full />
+            </div>
+            <dl className="grid grid-cols-1 gap-x-8 gap-y-3 text-sm sm:grid-cols-2">
+              {infoItems.map((item) => (
+                <div key={item.label} className="flex min-w-0 gap-3">
+                  <dt className="w-16 shrink-0 text-ink-secondary">{item.label}</dt>
+                  <dd className="min-w-0 break-words text-ink [overflow-wrap:anywhere]">
+                    {item.value}
+                  </dd>
+                </div>
+              ))}
+            </dl>
+          </div>
+        </section>
 
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-y-3 gap-x-8 text-slate-600 mt-4">
-                    <div className="flex items-center gap-2">
-                      <EnvironmentOutlined className="text-slate-400" />
-                      <span className="break-words [overflow-wrap:anywhere] min-w-0">
-                        Company:{' '}
-                        <span className="font-medium text-slate-800 break-words [overflow-wrap:anywhere]">
-                          {basic.company}
+        {/* 总评 */}
+        {evaluation.comment && (
+          <Section title="总评">
+            <ExpandableText
+              content={evaluation.comment}
+              lines={5}
+              threshold={160}
+              className="max-w-3xl text-[15px] leading-7 text-ink"
+            />
+          </Section>
+        )}
+
+        {/* 各维度得分 */}
+        <Section title="各维度得分">
+          {dimensions.length > 0 ? (
+            <ul className="divide-y divide-line">
+              {dimensions.map((d: any, i: number) => {
+                const dScore = toScore(d.score);
+                const dLevel = dScore != null ? scoreLevel(dScore) : null;
+                return (
+                  <li key={i} className="py-4 first:pt-0 last:pb-0">
+                    <div className="flex items-center justify-between gap-4">
+                      <span className="min-w-0 break-words font-medium text-ink [overflow-wrap:anywhere]">
+                        {d.dimension_name}
+                      </span>
+                      <span className="shrink-0 text-ink-secondary">
+                        <span
+                          className={`text-base font-semibold tabular-nums ${
+                            dLevel ? SCORE_TEXT_CLASS[dLevel] : 'text-ink'
+                          }`}
+                        >
+                          {dScore ?? '–'}
                         </span>
+                        <span className="ml-1 text-xs">/ 100</span>
                       </span>
                     </div>
-                    <div className="flex items-center gap-2">
-                      <UserOutlined className="text-slate-400" />
-                      <span className="break-words [overflow-wrap:anywhere] min-w-0">
-                        Role:{' '}
-                        <span className="font-medium text-slate-800 break-words [overflow-wrap:anywhere]">
-                          {basic.position}
-                        </span>
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <BarChartOutlined className="text-slate-400" />
-                      <span>
-                        Difficulty:{' '}
-                        <span className="font-medium text-slate-800">{basic.difficulty}</span>
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <ClockCircleOutlined className="text-slate-400" />
-                      <span>
-                        Duration:{' '}
-                        <span className="font-medium text-slate-800">{basic.duration}</span>
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-2 sm:col-span-2">
-                      <CalendarOutlined className="text-slate-400" />
-                      <span>
-                        Date: <span className="font-medium text-slate-800">{basic.time}</span>
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </Col>
-            <Col xs={24} lg={10}>
-              <div className="bg-slate-50 rounded-2xl px-6 py-10 flex flex-col xl:flex-row items-center justify-between gap-6 border border-slate-100">
-                <div className="flex-1 text-center xl:border-r border-slate-200 xl:pr-6 w-full xl:w-auto">
-                  <ScoreGauge score={basic.score} />
-                </div>
-                <div className="flex flex-col gap-3 w-full xl:w-[180px]">
-                  <Button
-                    type="primary"
-                    icon={<DownloadOutlined />}
-                    className="bg-blue-600 hover:bg-blue-500 h-10 rounded-xl shadow-lg shadow-blue-200 border-0 w-full"
-                  >
-                    Download Report
-                  </Button>
-                  <Button
-                    icon={<RobotOutlined />}
-                    className="h-10 rounded-xl border-blue-200 text-blue-600 hover:bg-blue-50 hover:border-blue-300 w-full"
-                  >
-                    AI Improvement Tips
-                  </Button>
-                </div>
-              </div>
-            </Col>
-          </Row>
-        </div>
-
-        {/* Analysis Content */}
-        <Row gutter={[24, 24]}>
-          <Col xs={24} lg={16}>
-            {/* Interviewer Comment */}
-            <div
-              className="bg-white rounded-3xl p-8 border border-slate-100 shadow-lg shadow-slate-200/50 animate-fade-in-up h-full"
-              style={{ animationDelay: '0.1s' }}
-            >
-              <div className="flex items-center gap-3 mb-6">
-                <div className="bg-indigo-100 p-2 rounded-lg text-indigo-600">
-                  <CheckCircleOutlined className="text-xl" />
-                </div>
-                <h3 className="text-xl font-bold text-slate-800 m-0">
-                  Overall Interviewer Feedback
-                </h3>
-              </div>
-              <div className="bg-indigo-50/50 p-6 rounded-2xl border border-indigo-50 text-slate-700 leading-relaxed text-lg">
-                <ExpandableMobileText
-                  content={evaluation.comment}
-                  lines={4}
-                  threshold={160}
-                  textClassName="text-slate-700 leading-relaxed text-lg"
-                />
-              </div>
-
-              <Divider className="my-8" />
-
-              <div className="flex items-center gap-3 mb-6">
-                <div className="bg-emerald-100 p-2 rounded-lg text-emerald-600">
-                  <BarChartOutlined className="text-xl" />
-                </div>
-                <h3 className="text-xl font-bold text-slate-800 m-0">
-                  Detailed Dimension Analysis
-                </h3>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {evaluation.dimensions?.map((d: any, i: number) => (
-                  <div
-                    key={i}
-                    className="bg-white border border-slate-200 rounded-xl p-5 hover:shadow-md transition-shadow duration-300"
-                  >
-                    <div className="flex justify-between items-center gap-3 mb-3 min-w-0">
-                      <Tag
-                        color="cyan"
-                        className="rounded-md px-2 py-0.5 text-sm font-medium m-0 border-0 bg-cyan-50 text-cyan-700 max-w-full break-words [overflow-wrap:anywhere]"
-                      >
-                        {dimensionNameMap[d.dimension_name] || d.dimension_name}
-                      </Tag>
-                      <span className="font-bold text-slate-800 text-lg">
-                        {d.score} <span className="text-xs text-slate-400 font-normal">/ 100</span>
-                      </span>
-                    </div>
-                    <ExpandableMobileText
-                      content={d.evaluation}
-                      lines={3}
-                      threshold={120}
-                      textClassName="text-slate-600 text-sm leading-relaxed m-0"
+                    <Progress
+                      percent={dScore != null ? Math.max(0, Math.min(100, dScore)) : 0}
+                      showInfo={false}
+                      strokeColor={dLevel ? SCORE_STROKE[dLevel] : undefined}
+                      size="small"
+                      className="mb-0"
                     />
-                  </div>
-                ))}
-              </div>
-            </div>
-          </Col>
+                    {d.evaluation && (
+                      <ExpandableText
+                        content={d.evaluation}
+                        lines={3}
+                        threshold={120}
+                        className="mt-1 max-w-3xl text-sm leading-6 text-ink-secondary"
+                      />
+                    )}
+                  </li>
+                );
+              })}
+            </ul>
+          ) : (
+            <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="暂无维度评分" />
+          )}
+        </Section>
 
-          <Col xs={24} lg={8}>
-            {/* Radar Chart */}
-            <div
-              className="bg-white rounded-3xl p-8 border border-slate-100 shadow-lg shadow-slate-200/50 animate-fade-in-up h-full"
-              style={{ animationDelay: '0.2s' }}
-            >
-              <div className="flex items-center gap-3 mb-6">
-                <div className="bg-purple-100 p-2 rounded-lg text-purple-600">
-                  <BulbOutlined className="text-xl" />
-                </div>
-                <h3 className="text-xl font-bold text-slate-800 m-0">Capability Radar</h3>
-              </div>
-              <div className="flex justify-center items-center py-4">
-                {evaluation.dimensions && evaluation.dimensions.length > 0 ? (
-                  <RadarChart items={evaluation.dimensions} size={320} />
-                ) : (
-                  <div className="text-slate-400 py-10">No dimension data</div>
-                )}
-              </div>
-              <div className="text-center text-slate-500 text-sm mt-4">
-                A five-dimension capability model generated from this interview.
-              </div>
-            </div>
-          </Col>
-        </Row>
-
-        {/* Q&A Records */}
-        <div
-          className="mt-8 bg-white rounded-3xl p-8 border border-slate-100 shadow-xl shadow-slate-200/50 animate-fade-in-up"
-          style={{ animationDelay: '0.3s' }}
+        {/* 逐题点评 */}
+        <Section
+          title="逐题点评"
+          extra={
+            answerRecords.length > 0 ? (
+              <span className="text-sm text-ink-secondary">共 {answerRecords.length} 题</span>
+            ) : undefined
+          }
         >
-          <div className="flex items-center gap-3 mb-8">
-            <div className="bg-orange-100 p-2 rounded-lg text-orange-600">
-              <ClockCircleOutlined className="text-xl" />
-            </div>
-            <h3 className="text-xl font-bold text-slate-800 m-0">Full Q&A Review</h3>
-          </div>
-
           {answerRecords && answerRecords.length > 0 ? (
-            <div className="space-y-8">
-              {answerRecords.map((rec: any, index) => (
-                <div key={index} className="group">
-                  <div className="flex items-center gap-3 mb-4">
-                    <div className="bg-slate-800 text-white w-8 h-8 rounded-lg flex items-center justify-center font-bold shadow-md">
-                      {rec.order}
-                    </div>
-                    <ExpandableMobileText
-                      content={rec.content}
-                      lines={2}
-                      threshold={80}
-                      textClassName="text-lg font-bold text-slate-800 group-hover:text-blue-600 transition-colors"
-                    />
-                  </div>
-
-                  <div className="border-l-2 border-slate-200 ml-4 pl-8 pb-8 space-y-6">
-                    {/* QA Pairs */}
-                    {rec.message?.map((m: any, mIdx: number) => (
-                      <div
-                        key={mIdx}
-                        className="bg-slate-50 rounded-2xl p-6 border border-slate-100"
-                      >
-                        <div className="mb-4">
-                          <span className="inline-block bg-blue-100 text-blue-700 text-xs font-bold px-2 py-1 rounded mb-2">
-                            Interviewer Question
-                          </span>
-                          <ExpandableMobileText
-                            content={m.question}
-                            lines={3}
-                            threshold={100}
-                            textClassName="text-slate-800 font-medium text-lg"
-                          />
-                        </div>
-                        <div className="bg-white rounded-xl p-4 border border-slate-100 shadow-sm">
-                          <span className="inline-block bg-green-100 text-green-700 text-xs font-bold px-2 py-1 rounded mb-2">
-                            Your Answer
-                          </span>
-                          <ExpandableMobileText
-                            content={m.answer}
-                            lines={4}
-                            threshold={140}
-                            textClassName="text-slate-600 leading-relaxed"
-                          />
-                        </div>
+            <ol className="divide-y divide-line">
+              {answerRecords.map((rec: any, index) => {
+                const c = rec.comment;
+                const commentRows = c
+                  ? [
+                      { label: '考察要点', val: c.key_points },
+                      { label: '亮点', val: c.strengths, color: 'text-success' },
+                      { label: '不足', val: c.weaknesses, color: 'text-danger' },
+                      { label: '改进建议', val: c.suggestion },
+                      { label: '答题思路', val: c.thinking },
+                      { label: '参考答案', val: c.reference },
+                    ].filter((item) => item.val)
+                  : [];
+                return (
+                  <li key={index} className="py-6 first:pt-0 last:pb-0">
+                    <div className="mb-4 flex items-start gap-3">
+                      <span className="mt-0.5 inline-flex h-6 min-w-[24px] shrink-0 items-center justify-center rounded bg-brand-50 px-1.5 text-xs font-semibold tabular-nums text-brand-800">
+                        {rec.order ?? index + 1}
+                      </span>
+                      <div className="min-w-0 flex-1">
+                        <ExpandableText
+                          content={rec.content}
+                          lines={2}
+                          threshold={80}
+                          className="max-w-3xl text-base font-medium leading-7 text-ink"
+                        />
                       </div>
-                    ))}
+                      {c && toScore(c.score) != null && (
+                        <span className="shrink-0 text-sm text-ink-secondary">
+                          <span className="text-base font-semibold tabular-nums text-ink">
+                            {c.score}
+                          </span>{' '}
+                          分
+                        </span>
+                      )}
+                    </div>
 
-                    {/* AI Comment for this Question */}
-                    {rec.comment && (
-                      <div className="bg-gradient-to-r from-orange-50 to-rose-50 rounded-2xl p-6 border border-orange-100">
-                        <div className="flex items-center gap-2 mb-4 text-orange-700 font-bold">
-                          <RobotOutlined /> AI Deep Review
-                        </div>
-
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                          <div className="bg-white/60 rounded-xl p-4">
-                            <div className="text-xs text-slate-400 uppercase tracking-wider font-bold mb-1">
-                              Question Score
+                    <div className="space-y-4 sm:pl-9">
+                      {rec.message?.map((m: any, mIdx: number) => (
+                        <div key={mIdx} className="max-w-3xl space-y-3">
+                          {m.question && (
+                            <div>
+                              <div className="mb-1 text-xs font-medium text-ink-secondary">
+                                面试官
+                              </div>
+                              <ExpandableText
+                                content={m.question}
+                                lines={3}
+                                threshold={100}
+                                className="text-[15px] leading-7 text-ink"
+                              />
                             </div>
-                            <div className="text-2xl font-bold text-orange-600">
-                              {rec.comment.score}{' '}
-                              <span className="text-sm text-slate-400">pts</span>
-                            </div>
+                          )}
+                          <div className="rounded-lg border border-line bg-canvas px-4 py-3">
+                            <div className="mb-1 text-xs font-medium text-brand-800">我的回答</div>
+                            {m.answer ? (
+                              <ExpandableText
+                                content={m.answer}
+                                lines={4}
+                                threshold={140}
+                                className="text-[15px] leading-7 text-ink"
+                              />
+                            ) : (
+                              <div className="text-[15px] leading-7 text-ink-muted">未作答</div>
+                            )}
                           </div>
-                          <div className="bg-white/60 rounded-xl p-4">
-                            <div className="text-xs text-slate-400 uppercase tracking-wider font-bold mb-1">
-                              Difficulty
-                            </div>
-                            <div className="text-lg font-bold text-slate-700">
-                              {toEnglishLabel(rec.comment.difficulty, difficultyMap)}
-                            </div>
-                          </div>
                         </div>
+                      ))}
 
-                        <div className="mt-6 space-y-4">
-                          {[
-                            { label: 'Key Points', val: rec.comment.key_points },
-                            {
-                              label: 'Strengths',
-                              val: rec.comment.strengths,
-                              color: 'text-green-700',
-                            },
-                            {
-                              label: 'Weaknesses',
-                              val: rec.comment.weaknesses,
-                              color: 'text-red-600',
-                            },
-                            {
-                              label: 'Suggestions',
-                              val: rec.comment.suggestion,
-                              color: 'text-blue-600',
-                            },
-                            { label: 'Recommended Approach', val: rec.comment.thinking },
-                            { label: 'Reference Answer', val: rec.comment.reference },
-                          ].map(
-                            (item, idx) =>
-                              item.val && (
+                      {c && (
+                        <div className="max-w-3xl rounded-lg border border-brand-200 px-4 py-4">
+                          <div className="mb-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
+                            <span className="inline-flex items-center gap-1.5 font-medium text-brand-800">
+                              <Bot className="h-[1em] w-[1em] shrink-0" aria-hidden="true" />
+                              AI 点评
+                            </span>
+                            {c.difficulty && (
+                              <span className="text-ink-secondary">
+                                难度：{difficultyLabel(c.difficulty)}
+                              </span>
+                            )}
+                          </div>
+                          {commentRows.length > 0 && (
+                            <dl className="space-y-3">
+                              {commentRows.map((item) => (
                                 <div
-                                  key={idx}
-                                  className="flex flex-col sm:flex-row gap-2 sm:gap-4 text-sm"
+                                  key={item.label}
+                                  className="flex flex-col gap-1 sm:flex-row sm:gap-4"
                                 >
-                                  <div className="min-w-[120px] font-bold text-slate-500 sm:text-right">
+                                  <dt className="shrink-0 text-sm font-medium text-ink-secondary sm:w-16">
                                     {item.label}
-                                  </div>
-                                  <div
-                                    className={`flex-1 ${item.color || 'text-slate-700'} leading-relaxed bg-white/40 p-2 rounded-lg`}
-                                  >
-                                    <ExpandableMobileText
+                                  </dt>
+                                  <dd className="min-w-0 flex-1">
+                                    <ExpandableText
                                       content={item.val}
                                       lines={4}
                                       threshold={140}
-                                      textClassName={`${item.color || 'text-slate-700'} leading-relaxed`}
+                                      className={`text-[15px] leading-7 ${item.color || 'text-ink'}`}
                                     />
-                                  </div>
+                                  </dd>
                                 </div>
-                              )
+                              ))}
+                            </dl>
                           )}
                         </div>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              ))}
-            </div>
+                      )}
+                    </div>
+                  </li>
+                );
+              })}
+            </ol>
           ) : (
-            <div className="text-center py-12">
-              <div className="text-6xl mb-4 opacity-20">📝</div>
-              <div className="text-slate-400">No answer records</div>
-            </div>
+            <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="暂无答题记录" />
           )}
-        </div>
+        </Section>
       </div>
     </div>
   );

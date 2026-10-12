@@ -1,50 +1,91 @@
 'use client';
 
-import {
-  Layout,
-  Typography,
-  Button,
-  Dropdown,
-  Modal,
-  Tabs,
-  Form,
-  Input,
-  message,
-  Drawer,
-} from 'antd';
+import { Button, Dropdown, Modal, Tabs, Form, Input, message, Drawer } from 'antd';
+import type { MenuProps } from 'antd';
 import Link from 'next/link';
-import { UserOutlined, DownOutlined, TeamOutlined, MenuOutlined, CloseOutlined } from '@ant-design/icons';
+import { ChevronDown, Menu, UserRound } from 'lucide-react';
 import type { FC } from 'react';
-import { useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useEffect, useState } from 'react';
+import { usePathname, useRouter } from 'next/navigation';
 import apiClient from '@/services/api/client';
 import { useAuth } from '@/hooks/useAuth';
 import { USER_API } from '@/config/api';
+import { INTERVIEW_TYPE_LIST } from '@/config/interviewTypes';
 
-const { Header } = Layout;
-const { Title } = Typography;
+const MANUAL_URL = 'https://awq7m8b63wy.feishu.cn/wiki/Cl8mwzOayiTtaZknRU2cyoFHndL';
+
+type AuthTab = 'login' | 'register' | 'forgot';
+
+const GoogleIcon = () => (
+  <svg className="h-4 w-4" viewBox="0 0 24 24" aria-hidden="true">
+    <path
+      fill="#4285F4"
+      d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
+    />
+    <path
+      fill="#34A853"
+      d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
+    />
+    <path
+      fill="#FBBC05"
+      d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"
+    />
+    <path
+      fill="#EA4335"
+      d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
+    />
+  </svg>
+);
+
+const GitHubIcon = () => (
+  <svg className="h-4 w-4" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+    <path
+      fillRule="evenodd"
+      d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.531 1.032 1.531 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.522 2 12 2z"
+      clipRule="evenodd"
+    />
+  </svg>
+);
 
 const Navbar: FC = () => {
   const router = useRouter();
+  const pathname = usePathname() || '/';
   const { user, isAuthenticated: authed, login, logout: authLogout } = useAuth();
   const [openAuth, setOpenAuth] = useState(false);
-  const [activeKey, setActiveKey] = useState<'login' | 'register' | 'forgot'>('login');
+  const [activeKey, setActiveKey] = useState<AuthTab>('login');
   const [loginForm] = Form.useForm();
   const [registerForm] = Form.useForm();
   const [forgotPasswordForm] = Form.useForm();
   const [guideModalOpen, setGuideModalOpen] = useState(false);
+  const [loginLoading, setLoginLoading] = useState(false);
+  const [registerLoading, setRegisterLoading] = useState(false);
   const [forgotLoading, setForgotLoading] = useState(false);
   const [githubLoading, setGithubLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [scrolled, setScrolled] = useState(false);
+
+  // 页面滚动后才显示底部分隔线，首屏保持通透
+  useEffect(() => {
+    const onScroll = () => setScrolled(window.scrollY > 8);
+    onScroll();
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => window.removeEventListener('scroll', onScroll);
+  }, []);
+
+  const openAuthModal = (tab: AuthTab = 'login') => {
+    setActiveKey(tab);
+    setOpenAuth(true);
+  };
 
   const doLogin = async (values: { email: string; password: string }) => {
+    setLoginLoading(true);
     try {
       const res: any = await apiClient.post(USER_API.LOGIN, values);
       const data = res?.data || res;
       const token = data?.token || data?.accessToken;
       if (!token) {
-        message.error('Login Failed' + '：' + 'Please enter your email'); // Using placeholder as generic error or keep generic
+        message.error('登录失败：未获取到登录凭证');
         return;
       }
       localStorage.setItem('token', token);
@@ -59,19 +100,22 @@ const Navbar: FC = () => {
         login({ id: '0', email: values.email, name: values.email, username: values.email });
       }
       setOpenAuth(false);
-      message.success('Login Successful');
+      message.success('登录成功');
     } catch (e: any) {
-      message.error(e?.response?.data?.message || 'Login Failed');
+      message.error(e?.response?.data?.message || '登录失败');
+    } finally {
+      setLoginLoading(false);
     }
   };
 
   const doRegister = async (values: { username: string; email: string; password: string }) => {
+    setRegisterLoading(true);
     try {
       const data: any = await apiClient.post(USER_API.REGISTER, values);
       const token = data?.token;
       const userData = data?.user;
       if (!token || !userData) {
-        message.error('Registration Failed');
+        message.error('注册失败');
         return;
       }
       localStorage.setItem('token', token);
@@ -82,9 +126,11 @@ const Navbar: FC = () => {
       login(userData);
       setOpenAuth(false);
       setGuideModalOpen(true);
-      message.success('Registration Successful');
+      message.success('注册成功');
     } catch (e: any) {
-      message.error(e?.response?.data?.message || 'Registration Failed');
+      message.error(e?.response?.data?.message || '注册失败');
+    } finally {
+      setRegisterLoading(false);
     }
   };
 
@@ -92,10 +138,10 @@ const Navbar: FC = () => {
     setForgotLoading(true);
     try {
       await apiClient.post('/user/password/forgot', values);
-      message.success('Reset link has been sent to your email, please check.');
+      message.success('重置链接已发送到你的邮箱，请注意查收');
       setActiveKey('login');
     } catch (e: any) {
-      message.error(e?.response?.data?.message || 'Failed to send.');
+      message.error(e?.response?.data?.message || '发送失败，请稍后重试');
     } finally {
       setForgotLoading(false);
     }
@@ -107,12 +153,13 @@ const Navbar: FC = () => {
       const res: any = await apiClient.get(USER_API.GITHUB_LOGIN);
       const loginUrl = res?.login_url || res?.data?.login_url;
       if (!loginUrl) {
-        message.error('Failed to get GitHub login URL.');
+        message.error('获取 GitHub 登录地址失败');
+        setGithubLoading(false);
         return;
       }
       window.location.href = loginUrl;
     } catch (e: any) {
-      message.error(e?.response?.data?.message || e?.message || 'GitHub login failed.');
+      message.error(e?.response?.data?.message || e?.message || 'GitHub 登录失败');
       setGithubLoading(false);
     }
   };
@@ -123,13 +170,13 @@ const Navbar: FC = () => {
       const res: any = await apiClient.get('/user/google/login');
       const loginUrl = res?.login_url || res?.data?.login_url;
       if (!loginUrl) {
-        message.error('Failed to get Google login URL');
+        message.error('获取 Google 登录地址失败');
         setGoogleLoading(false);
         return;
       }
       window.location.href = loginUrl;
     } catch (e: any) {
-      message.error(e?.response?.data?.message || e?.message || 'Google login failed');
+      message.error(e?.response?.data?.message || e?.message || 'Google 登录失败');
       setGoogleLoading(false);
     }
   };
@@ -141,162 +188,137 @@ const Navbar: FC = () => {
     localStorage.removeItem('token');
     localStorage.removeItem('user');
     authLogout();
-    message.success('Logout');
+    message.success('已退出登录');
     router.push('/');
   };
 
-  return (
-    <Header className="sticky top-0 z-50 w-full bg-white/80 backdrop-blur-md border-b border-slate-200/60 transition-all duration-300">
-      <div className="max-w-7xl mx-auto px-2 sm:px-4 lg:px-8 h-full flex items-center justify-between">
-        <div className="flex items-center gap-2 sm:gap-3 cursor-pointer shrink-0" onClick={() => router.push('/')}>
-          <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-lg sm:rounded-xl bg-gradient-to-br from-blue-600 to-indigo-600 flex items-center justify-center shadow-lg shadow-blue-200">
-            <span className="text-white text-base sm:text-xl font-bold">面</span>
-          </div>
-          <div className="hidden sm:flex flex-col justify-center h-10">
-            <span className="text-lg font-bold bg-clip-text text-transparent bg-gradient-to-r from-slate-800 to-slate-600 leading-none mb-0.5 pt-1">
-              Interview Bar
-            </span>
-            <span className="text-[10px] text-slate-500 tracking-wider uppercase font-medium leading-none scale-90 origin-left">
-              INTERVIEW Bar
-            </span>
-          </div>
-        </div>
+  const isActive = (href: string) => pathname === href || pathname.startsWith(`${href}/`);
+  const interviewActive = pathname.startsWith('/interview');
 
-        <nav className="hidden lg:flex items-center gap-8">
-          <Link
-            href="/resume"
-            className="text-sm font-medium text-slate-600 hover:text-blue-600 transition-colors relative group"
-          >
-            {'Resume Prediction'}
-            <span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-blue-600 transition-all group-hover:w-full" />
+  const navLinkClass = (active: boolean) =>
+    `inline-flex h-9 items-center gap-1 rounded-lg px-3 text-sm transition-colors duration-150 ${
+      active
+        ? 'bg-ink/[0.05] font-medium text-ink'
+        : 'text-ink-secondary hover:bg-ink/[0.04] hover:text-ink'
+    }`;
+
+  const interviewMenu: MenuProps['items'] = INTERVIEW_TYPE_LIST.map((t) => ({
+    key: t.kind,
+    label: (
+      <Link href={t.href} className="flex items-center gap-3 py-1.5">
+        <span
+          className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-base ${t.toneClass}`}
+        >
+          {t.icon}
+        </span>
+        <span className="flex flex-col">
+          <span className="font-medium text-ink">{t.label}</span>
+          <span className="text-xs text-ink-secondary">{t.description}</span>
+        </span>
+      </Link>
+    ),
+  }));
+
+  const userMenu: MenuProps['items'] = [
+    { key: 'center', label: <Link href="/user/center">个人中心</Link> },
+    { key: 'interviews', label: <Link href="/user/interviews">面试记录</Link> },
+    { key: 'press', label: <Link href="/user/press">押题记录</Link> },
+    { key: 'notes', label: <Link href="/user/notes">我的笔记</Link> },
+    { key: 'pay', label: <Link href="/user/pay">充值</Link> },
+    { type: 'divider' },
+    { key: 'logout', danger: true, label: '退出登录', onClick: logout },
+  ];
+
+  const oauthButtons = (
+    <div className="mt-5 border-t border-line pt-4">
+      <div className="mb-3 text-center text-xs text-ink-secondary">其他登录方式</div>
+      <div className="grid grid-cols-2 gap-2">
+        <Button
+          icon={<GoogleIcon />}
+          loading={googleLoading}
+          disabled={githubLoading}
+          onClick={doGoogleLogin}
+        >
+          Google
+        </Button>
+        <Button
+          icon={<GitHubIcon />}
+          loading={githubLoading}
+          disabled={googleLoading}
+          onClick={doGitHubLogin}
+        >
+          GitHub
+        </Button>
+      </div>
+    </div>
+  );
+
+  const emailRules = [
+    { required: true, message: '请输入邮箱' },
+    { type: 'email' as const, message: '邮箱格式不正确' },
+  ];
+
+  const drawerLinkClass = (active: boolean) =>
+    `block rounded-xl px-3 py-3 text-[15px] transition-colors duration-150 ${
+      active ? 'bg-brand-50 font-medium text-brand-800' : 'text-ink hover:bg-canvas'
+    }`;
+
+  return (
+    <header
+      className={`sticky top-0 z-40 h-16 w-full border-b bg-white/80 backdrop-blur-md transition-colors duration-200 supports-[backdrop-filter]:bg-white/70 ${
+        scrolled ? 'border-line' : 'border-transparent'
+      }`}
+    >
+      <div className="page flex h-full items-center justify-between gap-4">
+        <Link href="/" className="flex shrink-0 items-center gap-2.5" aria-label="面试吧首页">
+          <span className="flex h-8 w-8 items-center justify-center rounded-[9px] bg-brand-600 text-[15px] font-semibold text-white shadow-btn">
+            面
+          </span>
+          <span className="text-[17px] font-semibold tracking-tight text-ink">面试吧</span>
+        </Link>
+
+        <nav className="hidden flex-1 items-center gap-1 pl-8 lg:flex" aria-label="主导航">
+          <Link href="/resume" className={navLinkClass(isActive('/resume'))}>
+            简历押题
           </Link>
-          <Dropdown
-            menu={{
-              items: [
-                {
-                  key: 'social',
-                  label: (
-                    <Link href="/interview/social" className="flex items-center gap-2 py-1">
-                      <div className="w-8 h-8 rounded-lg bg-blue-50 flex items-center justify-center text-blue-600">
-                        <UserOutlined />
-                      </div>
-                      <div className="flex flex-col">
-                        <span className="font-medium">{'Experienced Interview'}</span>
-                        <span className="text-xs text-slate-400">
-                          {'Deep interview for experienced professionals'}
-                        </span>
-                      </div>
-                    </Link>
-                  ),
-                },
-                {
-                  key: 'campus',
-                  label: (
-                    <Link href="/interview/campus" className="flex items-center gap-2 py-1">
-                      <div className="w-8 h-8 rounded-lg bg-green-50 flex items-center justify-center text-green-600">
-                        <TeamOutlined />
-                      </div>
-                      <div className="flex flex-col">
-                        <span className="font-medium">{'Campus Interview'}</span>
-                        <span className="text-xs text-slate-400">
-                          {'Basic interview for fresh graduates'}
-                        </span>
-                      </div>
-                    </Link>
-                  ),
-                },
-              ],
-              className: 'p-2',
-            }}
-            overlayClassName="pt-2"
-          >
-            <a className="text-sm font-medium text-slate-600 hover:text-blue-600 transition-colors inline-flex items-center gap-1 cursor-pointer group">
-              <span>{'Comprehensive Interview'}</span>
-              <DownOutlined className="text-xs transition-transform group-hover:rotate-180" />
-              <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold leading-none text-white bg-gradient-to-r from-orange-500 to-red-500 ml-1">
-                HOT
-              </span>
-            </a>
+          <Dropdown menu={{ items: interviewMenu }} placement="bottomLeft">
+            <button type="button" className={navLinkClass(interviewActive)}>
+              模拟面试
+              <ChevronDown className="h-3.5 w-3.5" aria-hidden="true" />
+            </button>
           </Dropdown>
-          <Link
-            href="/interview/special"
-            className="text-sm font-medium text-slate-600 hover:text-blue-600 transition-colors relative group"
-          >
-            {'Specialized Interview'}
-            <span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-blue-600 transition-all group-hover:w-full" />
+          <Link href="/questions" className={navLinkClass(isActive('/questions'))}>
+            题库
           </Link>
-          <Link
-            href="https://awq7m8b63wy.feishu.cn/wiki/Cl8mwzOayiTtaZknRU2cyoFHndL"
-            target="_blank"
-            className="text-sm font-medium text-slate-600 hover:text-blue-600 transition-colors relative group"
-          >
-            {'User Manual'}
-            <span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-blue-600 transition-all group-hover:w-full" />
-          </Link>
+          <a href={MANUAL_URL} target="_blank" rel="noreferrer" className={navLinkClass(false)}>
+            使用手册
+          </a>
         </nav>
 
-        <div className="flex items-center gap-2 sm:gap-4 shrink-0">
+        <div className="flex shrink-0 items-center gap-2">
           {authed ? (
-            <Dropdown
-              trigger={['hover', 'click']}
-              menu={{
-                items: [
-                  { key: 'center', label: <Link href="/user/center">{'User Center'}</Link> },
-                  { key: 'pay', label: <Link href="/user/pay">{'Payment'}</Link> },
-                  {
-                    key: 'interviews',
-                    label: <Link href="/user/interviews">{'Interview Records'}</Link>,
-                  },
-                  { key: 'press', label: <Link href="/user/press">{'Prediction Records'}</Link> },
-                  { type: 'divider' },
-                  {
-                    key: 'logout',
-                    label: (
-                      <a onClick={logout} className="text-red-500">
-                        {'Logout'}
-                      </a>
-                    ),
-                  },
-                ],
-                className: 'w-40',
-              }}
-            >
-              <Button className="border-slate-200 hover:border-blue-400 hover:text-blue-600 px-2 sm:px-4 h-9 rounded-full flex items-center gap-2 transition-all">
-                <UserOutlined />
-                <span className="hidden sm:inline max-w-[100px] truncate">
-                  {user?.username || user?.email?.split('@')[0] || 'User'}
+            <Dropdown menu={{ items: userMenu }} placement="bottomRight" trigger={['click']}>
+              <Button icon={<UserRound className="h-4 w-4" aria-hidden="true" />}>
+                <span className="hidden max-w-[120px] truncate sm:inline">
+                  {user?.username || user?.email?.split('@')[0] || '用户'}
                 </span>
               </Button>
             </Dropdown>
           ) : (
             <>
-              <Button
-                type="primary"
-                onClick={() => {
-                  setActiveKey('login');
-                  setOpenAuth(true);
-                }}
-                className="hidden sm:flex bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 border-0 h-9 px-6 rounded-full shadow-lg shadow-blue-200 font-medium transition-all hover:scale-105 items-center"
-              >
-                {'Login / Register'}
+              <Button className="hidden sm:inline-flex" onClick={() => openAuthModal('login')}>
+                登录
               </Button>
-              <Button
-                type="primary"
-                shape="circle"
-                icon={<UserOutlined />}
-                onClick={() => {
-                  setActiveKey('login');
-                  setOpenAuth(true);
-                }}
-                className="sm:hidden bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 border-0 shadow-lg shadow-blue-200 transition-all"
-              />
+              <Button type="primary" onClick={() => openAuthModal('register')}>
+                注册
+              </Button>
             </>
           )}
-
           <Button
             type="text"
-            icon={<MenuOutlined className="text-slate-600 text-lg" />}
-            className="lg:hidden hover:bg-slate-100 flex items-center justify-center"
+            aria-label="打开菜单"
+            icon={<Menu className="h-5 w-5" aria-hidden="true" />}
+            className="lg:hidden"
             onClick={() => setDrawerOpen(true)}
           />
         </div>
@@ -306,305 +328,137 @@ const Navbar: FC = () => {
         placement="right"
         onClose={() => setDrawerOpen(false)}
         open={drawerOpen}
-        width={280}
-        closeIcon={<CloseOutlined />}
-        title={
-          <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-600 to-indigo-600 flex items-center justify-center">
-              <span className="text-white text-base font-bold">面</span>
-            </div>
-            <span className="font-bold bg-clip-text text-transparent bg-gradient-to-r from-slate-800 to-slate-600">
-              Interview Bar
-            </span>
-          </div>
-        }
+        width="min(100vw, 360px)"
+        title="面试吧"
       >
-        <nav className="flex flex-col gap-1">
-           <Link
-             href="/resume"
-            onClick={() => setDrawerOpen(false)}
-            className="block px-4 py-3 rounded-lg text-slate-600 hover:bg-blue-50 hover:text-blue-600 transition-colors font-medium"
-          >
-            {'Resume Prediction'}
+        <nav className="flex flex-col gap-1" onClick={() => setDrawerOpen(false)}>
+          <Link href="/resume" className={drawerLinkClass(isActive('/resume'))}>
+            简历押题
           </Link>
-          <div className="px-4 py-2 text-xs text-slate-400 font-medium uppercase tracking-wider">
-            {'Comprehensive Interview'}
-            <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold leading-none text-white bg-gradient-to-r from-orange-500 to-red-500 ml-2 align-middle">
-              HOT
-            </span>
-          </div>
-          <Link
-            href="/interview/social"
-            onClick={() => setDrawerOpen(false)}
-            className="block pl-8 pr-4 py-2.5 rounded-lg text-slate-600 hover:bg-blue-50 hover:text-blue-600 transition-colors text-sm"
-          >
-            <UserOutlined className="mr-2 text-blue-500" />
-            {'Experienced Interview'}
+          <div className="px-3 pb-1 pt-3 text-xs text-ink-secondary">模拟面试</div>
+          {INTERVIEW_TYPE_LIST.map((t) => (
+            <Link key={t.kind} href={t.href} className={drawerLinkClass(isActive(t.href))}>
+              <span className="flex items-center gap-2">
+                <span
+                  className={`flex h-6 w-6 items-center justify-center rounded text-xs ${t.toneClass}`}
+                >
+                  {t.icon}
+                </span>
+                {t.label}
+              </span>
+            </Link>
+          ))}
+          <div className="my-2 border-t border-line" />
+          <Link href="/questions" className={drawerLinkClass(isActive('/questions'))}>
+            题库
           </Link>
-          <Link
-            href="/interview/campus"
-            onClick={() => setDrawerOpen(false)}
-            className="block pl-8 pr-4 py-2.5 rounded-lg text-slate-600 hover:bg-blue-50 hover:text-blue-600 transition-colors text-sm"
-          >
-            <TeamOutlined className="mr-2 text-green-500" />
-            {'Campus Interview'}
-          </Link>
-          <Link
-            href="/interview/special"
-            onClick={() => setDrawerOpen(false)}
-            className="block px-4 py-3 rounded-lg text-slate-600 hover:bg-blue-50 hover:text-blue-600 transition-colors font-medium"
-          >
-            {'Specialized Interview'}
-          </Link>
-          <Link
-            href="https://awq7m8b63wy.feishu.cn/wiki/Cl8mwzOayiTtaZknRU2cyoFHndL"
-            target="_blank"
-            onClick={() => setDrawerOpen(false)}
-            className="block px-4 py-3 rounded-lg text-slate-600 hover:bg-blue-50 hover:text-blue-600 transition-colors font-medium"
-          >
-            {'User Manual'}
-          </Link>
+          <a href={MANUAL_URL} target="_blank" rel="noreferrer" className={drawerLinkClass(false)}>
+            使用手册
+          </a>
         </nav>
       </Drawer>
+
       <Modal
         open={openAuth}
         onCancel={() => setOpenAuth(false)}
         footer={null}
-        title={'Account Login / Register'}
-        destroyOnClose
+        title="登录面试吧"
+        width={420}
+        destroyOnHidden
       >
         <Tabs
           activeKey={activeKey}
-          onChange={(k) => setActiveKey(k as 'login' | 'register' | 'forgot')}
+          onChange={(k) => setActiveKey(k as AuthTab)}
           items={[
             {
               key: 'login',
-              label: 'Login',
+              label: '登录',
               children: (
-                <Form
-                  form={loginForm}
-                  layout="vertical"
-                  onFinish={doLogin}
-                  initialValues={{ email: '', password: '' }}
-                >
-                  <Form.Item
-                    label={'Email'}
-                    name="email"
-                    rules={[
-                      { required: true, message: 'Please enter your email' },
-                      { type: 'email', message: 'Invalid email' },
-                    ]}
-                  >
-                    <Input placeholder={'Please enter your email'} />
+                <Form form={loginForm} layout="vertical" onFinish={doLogin} requiredMark={false}>
+                  <Form.Item label="邮箱" name="email" rules={emailRules}>
+                    <Input placeholder="请输入邮箱" autoComplete="email" />
                   </Form.Item>
                   <Form.Item
-                    label={'Password'}
+                    label="密码"
                     name="password"
-                    rules={[{ required: true, message: 'Please enter your password' }]}
+                    rules={[{ required: true, message: '请输入密码' }]}
                   >
-                    <Input.Password placeholder={'Please enter your password'} />
+                    <Input.Password placeholder="请输入密码" autoComplete="current-password" />
                   </Form.Item>
-                  <div className="flex justify-end mb-4">
-                    <a
-                      className="text-sm text-blue-600 hover:text-blue-800"
-                      onClick={(e) => {
-                        e.preventDefault();
-                        setActiveKey('forgot');
-                      }}
+                  <div className="-mt-2 mb-4 flex justify-end">
+                    <Button
+                      type="link"
+                      size="small"
+                      className="px-0"
+                      onClick={() => setActiveKey('forgot')}
                     >
-                      {'Forgot password?'}
-                    </a>
+                      忘记密码？
+                    </Button>
                   </div>
-                  <Button type="primary" htmlType="submit" className="w-full">
-                    {'Login'}
+                  <Button type="primary" htmlType="submit" block loading={loginLoading}>
+                    登录
                   </Button>
-                  <div className="mt-4 pt-4 border-t border-slate-100">
-                    <div className="text-center text-xs text-slate-400 mb-2">Or sign in with</div>
-                    <div className="flex flex-col gap-2">
-                      <Button
-                        type="default"
-                        className="w-full flex items-center justify-center gap-2"
-                        loading={googleLoading}
-                        disabled={githubLoading}
-                        onClick={doGoogleLogin}
-                      >
-                        <svg className="w-5 h-5" viewBox="0 0 24 24" aria-hidden="true">
-                          <path
-                            fill="#4285F4"
-                            d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
-                          />
-                          <path
-                            fill="#34A853"
-                            d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
-                          />
-                          <path
-                            fill="#FBBC05"
-                            d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"
-                          />
-                          <path
-                            fill="#EA4335"
-                            d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
-                          />
-                        </svg>
-                        Google
-                      </Button>
-                      <Button
-                        type="default"
-                        className="w-full flex items-center justify-center gap-2"
-                        loading={githubLoading}
-                        disabled={googleLoading}
-                        onClick={doGitHubLogin}
-                      >
-                        <svg
-                          className="w-5 h-5"
-                          viewBox="0 0 24 24"
-                          fill="currentColor"
-                          aria-hidden="true"
-                        >
-                          <path
-                            fillRule="evenodd"
-                            d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.531 1.032 1.531 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.522 2 12 2z"
-                            clipRule="evenodd"
-                          />
-                        </svg>
-                        GitHub
-                      </Button>
-                    </div>
-                  </div>
+                  {oauthButtons}
                 </Form>
               ),
             },
             {
               key: 'register',
-              label: 'Register',
+              label: '注册',
               children: (
                 <Form
                   form={registerForm}
                   layout="vertical"
                   onFinish={doRegister}
-                  initialValues={{ username: '', email: '', password: '' }}
+                  requiredMark={false}
                 >
                   <Form.Item
-                    label={'Username'}
+                    label="用户名"
                     name="username"
-                    rules={[{ required: true, message: 'Please enter your username' }]}
+                    rules={[{ required: true, message: '请输入用户名' }]}
                   >
-                    <Input placeholder={'Please enter your username'} />
+                    <Input placeholder="请输入用户名" autoComplete="username" />
+                  </Form.Item>
+                  <Form.Item label="邮箱" name="email" rules={emailRules}>
+                    <Input placeholder="请输入邮箱" autoComplete="email" />
                   </Form.Item>
                   <Form.Item
-                    label={'Email'}
-                    name="email"
-                    rules={[
-                      { required: true, message: 'Please enter your email' },
-                      { type: 'email', message: 'Invalid email' },
-                    ]}
-                  >
-                    <Input placeholder={'Please enter your email'} />
-                  </Form.Item>
-                  <Form.Item
-                    label={'Password'}
+                    label="密码"
                     name="password"
-                    rules={[{ required: true, message: 'Please enter your password' }]}
+                    rules={[{ required: true, message: '请输入密码' }]}
                   >
-                    <Input.Password placeholder={'Please enter your password'} />
+                    <Input.Password placeholder="请设置密码" autoComplete="new-password" />
                   </Form.Item>
-                  <Button type="primary" htmlType="submit" className="w-full">
-                    {'Register and Login'}
+                  <Button type="primary" htmlType="submit" block loading={registerLoading}>
+                    注册并登录
                   </Button>
-                  <div className="mt-4 pt-4 border-t border-slate-100">
-                    <div className="text-center text-xs text-slate-400 mb-2">Or sign in with</div>
-                    <div className="flex flex-col gap-2">
-                      <Button
-                        type="default"
-                        className="w-full flex items-center justify-center gap-2"
-                        loading={googleLoading}
-                        disabled={githubLoading}
-                        onClick={doGoogleLogin}
-                      >
-                        <svg className="w-5 h-5" viewBox="0 0 24 24" aria-hidden="true">
-                          <path
-                            fill="#4285F4"
-                            d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
-                          />
-                          <path
-                            fill="#34A853"
-                            d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
-                          />
-                          <path
-                            fill="#FBBC05"
-                            d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"
-                          />
-                          <path
-                            fill="#EA4335"
-                            d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
-                          />
-                        </svg>
-                        Google
-                      </Button>
-                      <Button
-                        type="default"
-                        className="w-full flex items-center justify-center gap-2"
-                        loading={githubLoading}
-                        disabled={googleLoading}
-                        onClick={doGitHubLogin}
-                      >
-                        <svg
-                          className="w-5 h-5"
-                          viewBox="0 0 24 24"
-                          fill="currentColor"
-                          aria-hidden="true"
-                        >
-                          <path
-                            fillRule="evenodd"
-                            d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.531 1.032 1.531 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.522 2 12 2z"
-                            clipRule="evenodd"
-                          />
-                        </svg>
-                        GitHub
-                      </Button>
-                    </div>
-                  </div>
+                  {oauthButtons}
                 </Form>
               ),
             },
             {
               key: 'forgot',
-              label: 'Forgot Password',
+              label: '找回密码',
               children: (
                 <Form
                   form={forgotPasswordForm}
                   layout="vertical"
                   onFinish={doForgotPassword}
-                  initialValues={{ email: '' }}
+                  requiredMark={false}
                 >
-                  <Form.Item
-                    label={'Email'}
-                    name="email"
-                    rules={[
-                      { required: true, message: 'Please enter your email' },
-                      { type: 'email', message: 'Invalid email' },
-                    ]}
-                  >
-                    <Input placeholder={'Please enter your email'} />
+                  <p className="mb-4 text-sm text-ink-secondary">
+                    输入注册时使用的邮箱，我们会发送一封重置密码的邮件。
+                  </p>
+                  <Form.Item label="邮箱" name="email" rules={emailRules}>
+                    <Input placeholder="请输入邮箱" autoComplete="email" />
                   </Form.Item>
-                  <Button
-                    type="primary"
-                    htmlType="submit"
-                    loading={forgotLoading}
-                    className="w-full mb-4"
-                  >
-                    {'Send Reset Link'}
+                  <Button type="primary" htmlType="submit" block loading={forgotLoading}>
+                    发送重置链接
                   </Button>
-                  <div className="text-center">
-                    <a
-                      className="text-sm text-slate-500 hover:text-slate-700"
-                      onClick={(e) => {
-                        e.preventDefault();
-                        setActiveKey('login');
-                      }}
-                    >
-                      {'Back to Login'}
-                    </a>
+                  <div className="mt-3 text-center">
+                    <Button type="link" size="small" onClick={() => setActiveKey('login')}>
+                      返回登录
+                    </Button>
                   </div>
                 </Form>
               ),
@@ -617,36 +471,31 @@ const Navbar: FC = () => {
         open={guideModalOpen}
         onCancel={() => setGuideModalOpen(false)}
         footer={null}
-        title={'Welcome to Interview Master'}
+        title="欢迎来到面试吧"
         centered
-        width={600}
+        width={480}
       >
-        <div className="py-6 px-4">
-          <div className="mb-8 text-center">
-            <Title level={4}>{'Upload your resume to let AI customize your interview plan'}</Title>
-            <Typography.Text type="secondary">
-              {
-                'Go to personal center to upload resume, AI will generate targeted questions based on your resume.'
-              }
-            </Typography.Text>
-          </div>
-
-          <div className="mt-8 flex justify-center">
+        <div className="py-2">
+          <p className="text-base font-medium text-ink">先上传一份简历</p>
+          <p className="mt-2 text-sm leading-6 text-ink-secondary">
+            在个人中心上传简历后，AI
+            会根据你的项目和技能生成针对性的面试题，模拟面试也会围绕简历展开。
+          </p>
+          <div className="mt-6 flex justify-end gap-2">
+            <Button onClick={() => setGuideModalOpen(false)}>稍后再说</Button>
             <Button
               type="primary"
-              size="large"
               onClick={() => {
                 setGuideModalOpen(false);
                 router.push('/user/center');
               }}
-              className="w-full md:w-auto px-8"
             >
-              {'Upload Resume Now'}
+              去上传简历
             </Button>
           </div>
         </div>
       </Modal>
-    </Header>
+    </header>
   );
 };
 

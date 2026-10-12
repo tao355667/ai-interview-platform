@@ -1,12 +1,25 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Button, Card, message, Spin, Tag, Typography } from 'antd';
+import Link from 'next/link';
+import { Button, message, Tag } from 'antd';
+import { CircleAlert, CircleCheck, LoaderCircle } from 'lucide-react';
 import apiClient from '@/services/api/client';
 import { PAYMENT_API } from '@/config/api';
 import { useAuth } from '@/hooks/useAuth';
+import PayResultCard from '@/components/user/PayResultCard';
 
-const { Title, Text } = Typography;
+// 订单状态的中文展示，未知状态直接显示原值
+const STATUS_LABELS: Record<string, string> = {
+  CREATED: '已创建',
+  PENDING: '待支付',
+  PAID: '已支付',
+  FULFILLED: '已完成',
+  CANCELED: '已取消',
+  CANCELLED: '已取消',
+  FAILED: '支付失败',
+  REFUNDED: '已退款',
+};
 
 export default function PaySuccessPage() {
   const { user, isAuthenticated } = useAuth();
@@ -65,64 +78,78 @@ export default function PaySuccessPage() {
 
   const isSuccess = status === 'PAID' || status === 'FULFILLED';
 
+  let icon = (
+    <CircleAlert
+      className="h-[1em] w-[1em] shrink-0 text-warning"
+      strokeWidth={1.75}
+      aria-hidden="true"
+    />
+  );
+  let title = '暂未确认支付结果';
+  let description = '如果你已完成付款，可能是支付平台通知稍有延迟，请稍后刷新状态。';
+  if (loading) {
+    icon = (
+      <LoaderCircle
+        className="h-[1em] w-[1em] shrink-0 animate-spin text-brand-600"
+        strokeWidth={1.75}
+        aria-hidden="true"
+      />
+    );
+    title = '正在确认支付结果';
+    description = '正在查询订单状态，通常需要几秒钟，请勿关闭页面。';
+  } else if (isSuccess) {
+    icon = (
+      <CircleCheck
+        className="h-[1em] w-[1em] shrink-0 text-success"
+        strokeWidth={1.75}
+        aria-hidden="true"
+      />
+    );
+    title = '支付成功';
+    description = '订单已确认支付，感谢你的支持。';
+  } else if (!orderNo) {
+    title = '未找到订单信息';
+    description = '没有找到最近一次的支付订单，可以返回支付中心重新下单。';
+  }
+
+  const statusTag = loading ? (
+    <span className="text-ink-secondary">查询中…</span>
+  ) : (
+    <Tag color={isSuccess ? 'success' : 'default'} className="m-0">
+      {status ? (STATUS_LABELS[status] ?? status) : '未知'}
+    </Tag>
+  );
+
   return (
-    <div className="min-h-screen bg-slate-50 py-10">
-      <div className="container mx-auto px-4">
-        <Title level={2} className="text-slate-900 mb-2">
-          支付结果
-        </Title>
-        <Text className="text-slate-500">正在校验订单状态…</Text>
-
-        <div className="mt-8">
-          <Card className="rounded-3xl shadow-lg border border-slate-100">
-            <div className="flex flex-col gap-3">
-              <div>
-                <Text className="text-sm text-slate-500">订单号</Text>
-                <div className="mt-1 font-mono text-slate-900">{orderNo || '-'}</div>
-              </div>
-
-              <div>
-                <Text className="text-sm text-slate-500">状态</Text>
-                <div className="mt-1">
-                  {loading ? (
-                    <span className="inline-flex items-center gap-2">
-                      <Spin size="small" /> 处理中…
-                    </span>
-                  ) : (
-                    <Tag color={isSuccess ? 'success' : 'default'}>
-                      {status ? status : '未知'}
-                    </Tag>
-                  )}
-                </div>
-              </div>
-
-              <div className="text-xs text-slate-400">
-                说明：支付状态以后台 webhook 校验和订单查询为准。
-              </div>
-
-              <div className="mt-2 flex gap-3">
-                <Button
-                  className="rounded-xl"
-                  onClick={() => {
-                    window.location.href = '/user/pay';
-                  }}
-                >
-                  返回支付中心
-                </Button>
-                <Button
-                  type="primary"
-                  className="bg-blue-600 hover:bg-blue-500 rounded-xl"
-                  onClick={() => window.location.reload()}
-                  disabled={loading}
-                >
-                  刷新状态
-                </Button>
-              </div>
-            </div>
-          </Card>
-        </div>
-      </div>
-    </div>
+    <PayResultCard
+      icon={icon}
+      title={title}
+      description={description}
+      details={[
+        { label: '订单号', value: <span className="font-mono">{orderNo || '-'}</span> },
+        { label: '订单状态', value: statusTag },
+      ]}
+      note="支付状态以后台 webhook 校验和订单查询结果为准。"
+      actions={
+        <>
+          <Button
+            onClick={() => {
+              window.location.href = '/user/pay';
+            }}
+          >
+            返回支付中心
+          </Button>
+          {isSuccess ? (
+            <Link href="/user/center">
+              <Button type="primary">前往个人中心</Button>
+            </Link>
+          ) : (
+            <Button type="primary" onClick={() => window.location.reload()} disabled={loading}>
+              刷新状态
+            </Button>
+          )}
+        </>
+      }
+    />
   );
 }
-

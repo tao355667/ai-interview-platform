@@ -19,10 +19,8 @@ export default function Page() {
 'use client';
 
 import { useMemo, useState } from 'react';
-import { Typography, Row, Col, Card as AntCard, List, Tag, Space, Divider } from 'antd';
-import { BookOutlined, BulbOutlined, CheckCircleOutlined } from '@ant-design/icons';
-
-const { Title, Paragraph, Text } = Typography;
+import Link from 'next/link';
+import PageHeader from '@/components/common/PageHeader';
 
 const staticData = {
   questions: [
@@ -84,101 +82,69 @@ export default function InterviewDetailPage() {
   );
 
   return (
-    <div className="container mx-auto px-4">
-      <Title level={2} className="mt-2">
-        押题详情
-      </Title>
+    <div className="page py-10">
+      <PageHeader
+        title="押题详情"
+        description="查看答案思路、参考答案与可能的追问"
+        extra={
+          <Link href="/user/interviews" className="text-ink-secondary hover:text-brand-800">
+            返回面试记录
+          </Link>
+        }
+      />
 
-      <Row gutter={[24, 24]} className="mt-2">
-        <Col xs={24} md={6}>
-          <AntCard className="rounded-2xl" styles={{ body: { padding: 0 } }}>
-            <div className="p-4 border-b">
-              <Space align="center">
-                <BookOutlined />
-                <Text>目录</Text>
-              </Space>
-            </div>
-            <List
-              itemLayout="horizontal"
-              dataSource={staticData.questions}
-              renderItem={(item, index) => (
-                <List.Item
+      <div className="grid gap-4 md:grid-cols-[280px_1fr]">
+        <nav className="surface self-start overflow-hidden">
+          <div className="border-b border-line px-4 py-3 text-sm font-medium text-ink">目录</div>
+          <ol>
+            {staticData.questions.map((item, index) => (
+              <li key={index}>
+                <button
+                  type="button"
                   onClick={() => setSelected(index)}
-                  style={{
-                    cursor: 'pointer',
-                    background: index === selected ? '#f6ffed' : undefined,
-                  }}
+                  className={`w-full px-4 py-3 text-left text-sm transition-colors duration-150 ${
+                    index === selected
+                      ? 'bg-brand-50 font-medium text-brand-800'
+                      : 'text-ink-secondary hover:text-ink'
+                  }`}
                 >
-                  <List.Item.Meta
-                    title={
-                      <span>
-                        {index + 1}. {item.title}
-                      </span>
-                    }
-                  />
-                </List.Item>
-              )}
-            />
-          </AntCard>
-        </Col>
-        <Col xs={24} md={18}>
-          <AntCard className="rounded-2xl" styles={{ body: { padding: 24 } }}>
-            <Space size={12} style={{ width: '100%', justifyContent: 'space-between' }}>
-              <Title level={4} style={{ margin: 0 }}>
-                {current.question}
-              </Title>
-              <Space>
-                <Tag color="green">整体思路</Tag>
-                <Tag>参考答案</Tag>
-                <Tag>收藏单题</Tag>
-                <Tag>复制题目</Tag>
-              </Space>
-            </Space>
-            <Divider />
+                  {index + 1}. {item.title}
+                </button>
+              </li>
+            ))}
+          </ol>
+        </nav>
 
-            <Space direction="vertical" style={{ width: '100%' }}>
-              <Space align="center" className="text-green-700">
-                <CheckCircleOutlined />
-                <Text strong>答案思路</Text>
-              </Space>
-              <Row gutter={[12, 12]}>
-                {current.idea.map((it, idx) => (
-                  <Col key={idx} xs={24} md={12}>
-                    <AntCard size="small">
-                      <Space>
-                        <BulbOutlined />
-                        <Text strong>{it.label}</Text>
-                      </Space>
-                      <Paragraph style={{ marginTop: 8 }}>{it.value}</Paragraph>
-                    </AntCard>
-                  </Col>
-                ))}
-              </Row>
-            </Space>
+        <article className="surface space-y-6 p-5 sm:p-6">
+          <h2 className="max-w-3xl text-lg font-semibold leading-7 text-ink">{current.question}</h2>
 
-            <Divider />
+          <section>
+            <h3 className="mb-3 text-base font-semibold text-ink">答案思路</h3>
+            <div className="grid gap-3 sm:grid-cols-2">
+              {current.idea.map((it, idx) => (
+                <div key={idx} className="rounded-lg border border-line bg-canvas p-4">
+                  <div className="mb-1 text-sm font-medium text-brand-800">{it.label}</div>
+                  <p className="text-[15px] leading-7 text-ink">{it.value}</p>
+                </div>
+              ))}
+            </div>
+          </section>
 
-            <Space direction="vertical" style={{ width: '100%' }}>
-              <Text strong>参考答案</Text>
-              <Paragraph>{current.reference}</Paragraph>
-            </Space>
+          <section>
+            <h3 className="mb-2 text-base font-semibold text-ink">参考答案</h3>
+            <p className="max-w-3xl text-[15px] leading-7 text-ink">{current.reference}</p>
+          </section>
 
-            <Divider />
-
-            <Space direction="vertical" style={{ width: '100%' }}>
-              <Text strong>可能追问</Text>
-              <List
-                dataSource={current.followups}
-                renderItem={(t) => (
-                  <List.Item>
-                    <Text>{t}</Text>
-                  </List.Item>
-                )}
-              />
-            </Space>
-          </AntCard>
-        </Col>
-      </Row>
+          <section>
+            <h3 className="mb-2 text-base font-semibold text-ink">可能追问</h3>
+            <ul className="max-w-3xl list-disc space-y-1 pl-5 text-[15px] leading-7 text-ink">
+              {current.followups.map((t) => (
+                <li key={t}>{t}</li>
+              ))}
+            </ul>
+          </section>
+        </article>
+      </div>
     </div>
   );
 }

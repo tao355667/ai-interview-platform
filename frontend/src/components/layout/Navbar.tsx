@@ -270,11 +270,11 @@ const Navbar: FC = () => {
       }`}
     >
       <div className="page flex h-full items-center justify-between gap-4">
-        <Link href="/" className="flex shrink-0 items-center gap-2.5" aria-label="面试吧首页">
+        <Link href="/" className="flex shrink-0 items-center gap-2.5" aria-label="面策首页">
           <span className="flex h-8 w-8 items-center justify-center rounded-[9px] bg-brand-600 text-[15px] font-semibold text-ink shadow-btn">
             面
           </span>
-          <span className="text-[17px] font-semibold tracking-tight text-ink">面试吧</span>
+          <span className="text-[17px] font-semibold tracking-tight text-ink">面策</span>
         </Link>
 
         <nav className="hidden flex-1 items-center gap-1 pl-8 lg:flex" aria-label="主导航">
@@ -329,7 +329,7 @@ const Navbar: FC = () => {
         onClose={() => setDrawerOpen(false)}
         open={drawerOpen}
         width="min(100vw, 360px)"
-        title="面试吧"
+        title="面策"
       >
         <nav className="flex flex-col gap-1" onClick={() => setDrawerOpen(false)}>
           <Link href="/resume" className={drawerLinkClass(isActive('/resume'))}>
@@ -362,7 +362,7 @@ const Navbar: FC = () => {
         open={openAuth}
         onCancel={() => setOpenAuth(false)}
         footer={null}
-        title="登录面试吧"
+        title="登录面策"
         width={420}
         destroyOnHidden
       >
@@ -471,7 +471,7 @@ const Navbar: FC = () => {
         open={guideModalOpen}
         onCancel={() => setGuideModalOpen(false)}
         footer={null}
-        title="欢迎来到面试吧"
+        title="欢迎来到面策"
         centered
         width={480}
       >

@@ -600,7 +600,7 @@ export default function ThreadHero() {
               className={cn(s.rise, 'flex items-center gap-2 text-[13px] text-ink-secondary')}
               style={{ '--d': 150 } as CSSProperties}
             >
-              <span className="font-mono text-brand-800">面试吧</span>
+              <span className="font-mono text-brand-800">面策</span>
               <span className="h-px w-8 bg-line-strong" aria-hidden="true" />
               AI 模拟面试
             </p>

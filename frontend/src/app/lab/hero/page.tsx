@@ -1,6 +1,6 @@
 import type { Metadata } from 'next';
 import Hero from '@/components/home/Hero';
-import ModeBento from '@/components/home/ModeBento';
+import ModesChapter from '@/components/home/modes/ModesChapter';
 
 // 首屏调试页：和首页同一个组件，多一条状态切换的调试条，不进搜索引擎
 export const metadata: Metadata = {
@@ -12,7 +12,7 @@ export default function HeroLabPage() {
   return (
     <>
       <Hero debug />
-      <ModeBento />
+      <ModesChapter />
     </>
   );
 }

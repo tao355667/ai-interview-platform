@@ -15,7 +15,7 @@ const SYL_VEC4 = 12; // 每个 vec4 存两个音节（time, amp, time, amp）
 /** 相机到核心中心的距离（以核心尺度为单位），线和 raymarching 必须一致 */
 const CAM = 3.2;
 /** 线经过这些文字时变淡 */
-export const SHIELD_SLOTS = 6;
+export const SHIELD_SLOTS = 8;
 
 /** 由 React 组件每帧写入的模拟状态（可变对象，避免触发重渲染） */
 export interface CrystalSim {

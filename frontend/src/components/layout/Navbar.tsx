@@ -12,7 +12,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { USER_API } from '@/config/api';
 import { INTERVIEW_TYPE_LIST } from '@/config/interviewTypes';
 
-const MANUAL_URL = 'https://awq7m8b63wy.feishu.cn/wiki/Cl8mwzOayiTtaZknRU2cyoFHndL';
+const MANUAL_URL = 'https://my.feishu.cn/wiki/AkIGwsJ9risuA7k53Gfc81pbnEf?create_from=create_doc_to_wiki';
 
 type AuthTab = 'login' | 'register' | 'forgot';
 

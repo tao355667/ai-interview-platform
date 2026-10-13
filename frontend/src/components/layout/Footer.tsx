@@ -6,7 +6,7 @@ import type { FC } from 'react';
 import { INTERVIEW_TYPE_LIST } from '@/config/interviewTypes';
 
 const RESOURCE_LINKS = [
-  { label: '使用手册', href: 'https://awq7m8b63wy.feishu.cn/wiki/Cl8mwzOayiTtaZknRU2cyoFHndL' },
+  { label: '使用手册', href: 'https://my.feishu.cn/wiki/AkIGwsJ9risuA7k53Gfc81pbnEf?create_from=create_doc_to_wiki' },
   { label: '演示视频', href: 'https://www.bilibili.com/video/BV1DavmBzEJu/' },
   { label: '视频教程', href: 'https://www.bilibili.com/video/BV1UCmEBQEW8/' },
   { label: '课程介绍', href: 'https://mp.weixin.qq.com/s/DlKoCQ7zUitCoiSoZzdVCQ' },

@@ -672,7 +672,7 @@ export default function InterviewRoom({ config }: { config: InterviewRoomConfig 
             </div>
           )}
 
-          <div className="rounded-card border border-line-strong bg-white shadow-xs transition-[border-color,box-shadow] duration-150 focus-within:border-brand-600 focus-within:shadow-[0_0_0_4px_rgba(16,187,131,0.12)]">
+          <div className="rounded-card border border-line-strong bg-white shadow-xs transition-[border-color,box-shadow] duration-150 focus-within:border-brand-700 focus-within:shadow-[0_0_0_4px_rgba(191,234,46,0.35)]">
             <Input.TextArea
               ref={answerInputRef}
               value={answer}

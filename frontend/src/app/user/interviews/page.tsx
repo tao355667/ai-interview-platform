@@ -274,7 +274,7 @@ export default function InterviewRecordsPage() {
                     </div>
                     <Link
                       href={`/user/interviews/results/${it.id}`}
-                      className="inline-flex h-9 shrink-0 items-center rounded border border-line-strong bg-white px-4 text-sm font-medium text-ink transition-colors duration-150 hover:border-brand-600 hover:text-brand-800"
+                      className="inline-flex h-9 shrink-0 items-center rounded border border-line-strong bg-white px-4 text-sm font-medium text-ink transition-colors duration-150 hover:border-brand-700 hover:text-brand-800"
                     >
                       查看报告
                     </Link>

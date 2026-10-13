@@ -74,7 +74,7 @@ function ProgressDemo() {
           <polyline
             points={pts}
             fill="none"
-            stroke="#10BB83"
+            stroke="#4D6A06"
             strokeWidth="2.5"
             strokeLinejoin="round"
             strokeLinecap="round"
@@ -85,8 +85,8 @@ function ProgressDemo() {
               cx={(i / (scores.length - 1)) * w}
               cy={h - ((s - 55) / 35) * h}
               r={i === scores.length - 1 ? 4.5 : 3}
-              fill={i === scores.length - 1 ? '#10BB83' : '#FFFFFF'}
-              stroke="#10BB83"
+              fill={i === scores.length - 1 ? '#BFEA2E' : '#FFFFFF'}
+              stroke="#4D6A06"
               strokeWidth="2"
             />
           ))}

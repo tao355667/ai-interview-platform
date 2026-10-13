@@ -84,7 +84,7 @@ export default function PayPage() {
         {products.map((p) => (
           <div
             key={p.key}
-            className={`surface-interactive flex flex-col p-6 ${p.recommended ? 'border-brand-600 hover:border-brand-600' : ''}`}
+            className={`surface-interactive flex flex-col p-6 ${p.recommended ? 'border-brand-700 hover:border-brand-700' : ''}`}
           >
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
@@ -110,7 +110,7 @@ export default function PayPage() {
               {p.features.map((f) => (
                 <li key={f} className="flex items-center gap-2">
                   <Check
-                    className="h-[1em] w-[1em] shrink-0 text-xs text-brand-600"
+                    className="h-[1em] w-[1em] shrink-0 text-xs text-brand-800"
                     aria-hidden="true"
                   />
                   {f}

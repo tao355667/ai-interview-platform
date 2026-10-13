@@ -2,7 +2,7 @@
 
 风格：**高级浅色 SaaS（Premium Light SaaS）**。现代极简、字体排版有层次、Bento 网格、克制的微动效、具有 AI 产品特征。
 
-原则：高级感优先于炫酷感，统一性优先于特效数量，产品体验优先于视觉装饰。大胆只用在一处（首页的实时面试台），其余区域保持安静。
+原则：高级感优先于炫酷感，统一性优先于特效数量，产品体验优先于视觉装饰。大胆只用在一处（首页首屏的「线索」装置），其余区域保持安静。
 
 ## 颜色
 
@@ -15,10 +15,10 @@
 | 墨黑 | `text-ink` | `#0E1A15` | 标题、正文 |
 | 辅文 | `text-ink-secondary` | `#56635D` | 描述、标签名、时间 |
 | 弱化 | `text-ink-muted` | `#8A958F` | 仅占位符、禁用、计数等非关键信息 |
-| 青玉（主色） | `bg-brand-600` | `#10BB83` | 主按钮、选中态、进度条、图标、光效 |
-| 深青玉 | `text-brand-800` | `#0B7F59` | 浅底上的绿色文字和链接（`#10BB83` 做文字对比度不够） |
-| 森林 | `bg-forest` | `#0B2A21` | **全站唯一的深色区块**（首页简历押题），其上的绿色可直接做文字 |
-| 薄荷光 | `mint` | `#A7F3D0` | 只用于局部光晕和深色区块上的强调，低透明度 |
+| 荧光黄绿（主色） | `bg-brand-600` | `#BFEA2E` | **只做填充**：主按钮、选中态、进度条、荧光笔 `.mark`；上面的文字一律用墨黑 `text-ink` |
+| 深橄榄 | `text-brand-800` | `#4D6A06` | 浅底上的品牌色文字、链接、图标、焦点描边（荧光黄绿做文字对比度只有约 1.4:1） |
+| 森林墨绿 | `bg-forest` | `#0F1F17` | **全站唯一的深色区块**（首页简历押题），荧光黄绿在上面可以直接做文字 |
+| 浅荧光 | `mint` | `#D9F58A` | 深色区块上的强调文字和局部光晕 |
 | 分隔线 | `border-line` / `border-line-strong` | `#E4E8E6` / `#CDD4D0` | 边框、分割线、输入框 |
 | 辅助色 | `accent-*` / `violet-*` / `warning` | | 只用于图标和小标签的类型区分 |
 | 语义色 | `success` / `warning` / `danger` 及 `*-soft` | | 状态、分数、错误 |
@@ -27,8 +27,8 @@
 
 ### 渐变与光效（只允许以下几种）
 
-- 面试台背后的一团青玉色柔光、深色区块里的一团薄荷光晕、结尾 CTA 顶部的柔光（`radial-gradient`，低透明度）
-- 面试台边缘的流光 `BorderBeam`
+- 首屏装置背后的一团荧光、深色区块里的一团浅荧光光晕、结尾 CTA 顶部的柔光（`radial-gradient`，低透明度）
+- 首屏对话卡片的玻璃效果（`bg-white/60 backdrop-blur-xl shadow-glass`），只用在压在装置上的卡片
 - 主按钮顶部 1px 高光（`shadow-btn`）
 - 首屏淡网格底纹 `.bg-grid`
 
@@ -91,19 +91,19 @@
 | Bento 卡片 hover | `.spotlight` + 上浮 1px | 200ms |
 | 数字 | `<NumberTicker>` | 进入视口时滚动 |
 | 流程 / 协作连线 | `<AnimatedBeam>` | |
-| 面试台 | 自研脚本动画 | 离开视口或切到后台标签页时暂停，可手动暂停 |
+| 首屏「线索」装置 | 自研 WebGL（`components/home/hero/crystalRenderer.ts`） | 镂空金属外壳 + 透明水晶 + 三道丝线轨道环；倾听 / 思考 / 追问三种形态；滚动时轨道环垂下接到「四种面试模式」卡片（`data-thread-anchor`）。调试页 `/lab/hero` |
 
 规则：
 
 - 每屏最多 1–2 个持续运动的元素；声波等装饰动画默认静止，hover 时才运动
 - 只动 `transform` / `opacity`，不动宽高（进度条宽度除外）
-- 必须支持“减弱动态效果”：`MotionConfig reducedMotion="user"` 关闭位移动画；CSS 动画由 `globals.css` 的媒体查询统一关闭；面试台直接显示最终状态；评价滚动条改为可手动横向滚动
+- 必须支持“减弱动态效果”：`MotionConfig reducedMotion="user"` 关闭位移动画；CSS 动画由 `globals.css` 的媒体查询统一关闭；首屏装置只渲染一帧静态画面；评价滚动条改为可手动横向滚动
 
 ## 组件与来源
 
 | 组件 | 位置 | 来源 |
 |---|---|---|
-| `NumberTicker` / `AnimatedBeam` / `BorderBeam` | `src/components/motion/` | 移植自 [Magic UI](https://magicui.design/)（MIT），改为 Tailwind v3 + `m` 组件 |
+| `NumberTicker` / `AnimatedBeam` | `src/components/motion/` | 移植自 [Magic UI](https://magicui.design/)（MIT），改为 Tailwind v3 + `m` 组件 |
 | `Spotlight` | `src/components/motion/` | 思路参考 [React Bits](https://reactbits.dev/) Spotlight Card，纯 CSS 变量实现 |
 | `Reveal` / `MotionProvider` | `src/components/motion/` | 基于 [Motion](https://motion.dev/) |
 | 图标 | `lucide-react` | 装饰图标加 `aria-hidden`，纯图标按钮必须有中文 `aria-label` |

@@ -13,28 +13,29 @@ module.exports = {
   theme: {
     extend: {
       colors: {
-        // 主色：青玉绿。600 为主色（按钮、选中态、光效），800 用于浅底上的文字和链接
+        // 主色：荧光黄绿。只用作填充（按钮、进度、高亮笔刷），上面的文字用墨黑
+        // 浅底上的文字、链接、图标一律用 800（深橄榄），600 直接做文字对比度只有约 1.4:1
         brand: {
-          50: '#E8F8F1',
-          100: '#D0F1E3',
-          200: '#A8E4CC',
-          300: '#70D3AE',
-          400: '#3EC696',
-          500: '#22C08C',
-          600: '#10BB83',
-          700: '#0E9F70',
-          800: '#0B7F59',
-          900: '#08613F',
+          50: '#F7FDE7',
+          100: '#EEFAC6',
+          200: '#DDF59A',
+          300: '#CDEF6C',
+          400: '#C4EC4A',
+          500: '#CFF25A',
+          600: '#BFEA2E',
+          700: '#9CC41A',
+          800: '#4D6A06',
+          900: '#36490A',
         },
-        // 森林绿：全站唯一的深色区块（首页简历押题）
+        // 森林墨绿：全站唯一的深色区块，荧光黄绿在上面最醒目
         forest: {
-          DEFAULT: '#0B2A21',
-          800: '#0F3529',
-          700: '#164536',
-          600: '#1F5A46',
+          DEFAULT: '#0F1F17',
+          800: '#15291F',
+          700: '#1C3628',
+          600: '#264634',
         },
-        // 薄荷光：只用于局部光晕，低透明度使用
-        mint: '#A7F3D0',
+        // 浅荧光：深色区块上的强调文字和局部光晕
+        mint: '#D9F58A',
         // 辅助蓝：信息提示、次要区分
         accent: {
           50: '#E8F2FD',
@@ -61,7 +62,7 @@ module.exports = {
           strong: '#CDD4D0',
         },
         canvas: '#F7F8F7',
-        // 语义色
+        // 语义色：成功仍用绿色，和品牌色分开，保证状态含义清楚
         success: { DEFAULT: '#0B7F59', soft: '#E8F8F1' },
         warning: { DEFAULT: '#B7791F', soft: '#FBF3E3' },
         danger: { DEFAULT: '#D14343', soft: '#FCECEC' },
@@ -95,11 +96,14 @@ module.exports = {
           '0 1px 2px rgba(14, 26, 21, 0.05), 0 16px 36px -14px rgba(14, 26, 21, 0.18)',
         // 悬浮层：下拉、弹窗、提示
         pop: '0 2px 6px rgba(14, 26, 21, 0.06), 0 12px 32px -8px rgba(14, 26, 21, 0.18)',
-        // 主按钮：顶部 1px 高光 + 贴边绿色阴影
-        btn: 'inset 0 1px 0 rgba(255, 255, 255, 0.22), 0 1px 2px rgba(11, 127, 89, 0.32)',
+        // 主按钮：顶部 1px 高光 + 贴边橄榄色阴影
+        btn: 'inset 0 1px 0 rgba(255, 255, 255, 0.45), 0 1px 2px rgba(77, 106, 6, 0.35)',
         // 首屏面试台
         console:
-          '0 1px 2px rgba(14, 26, 21, 0.05), 0 32px 80px -32px rgba(11, 127, 89, 0.35)',
+          '0 1px 2px rgba(14, 26, 21, 0.05), 0 32px 80px -32px rgba(77, 106, 6, 0.3)',
+        // 首屏玻璃卡片：压在水晶前面
+        glass:
+          'inset 0 1px 0 rgba(255, 255, 255, 0.7), 0 1px 2px rgba(14, 26, 21, 0.05), 0 24px 60px -24px rgba(14, 26, 21, 0.28)',
       },
       maxWidth: {
         page: '1200px',
@@ -125,6 +129,11 @@ module.exports = {
           '0%, 80%, 100%': { opacity: '0.25' },
           '40%': { opacity: '1' },
         },
+        // 荧光笔：从左到右划过
+        mark: {
+          from: { backgroundSize: '0% 100%' },
+          to: { backgroundSize: '100% 100%' },
+        },
       },
       animation: {
         rise: 'rise 0.6s cubic-bezier(0.2, 0.7, 0.2, 1) both',
@@ -132,6 +141,7 @@ module.exports = {
         wave: 'wave 1s ease-in-out infinite',
         marquee: 'marquee var(--marquee-duration, 48s) linear infinite',
         dot: 'dot 1.2s ease-in-out infinite',
+        mark: 'mark 0.7s cubic-bezier(0.6, 0, 0.2, 1) both',
       },
     },
   },

@@ -28,7 +28,7 @@ export const INTERVIEW_TYPES: Record<InterviewKind, InterviewTypeMeta> = {
     description: '面向有工作经验的候选人，围绕简历项目深挖',
     href: '/interview/social',
     icon: icon(Briefcase),
-    toneClass: 'bg-brand-50 text-brand-700',
+    toneClass: 'bg-brand-50 text-brand-800',
   },
   campus: {
     kind: 'campus',

@@ -381,14 +381,14 @@ export default function UserCenterPage() {
                 <p className="ant-upload-drag-icon">
                   {uploading ? (
                     <LoaderCircle
-                      className="inline-block text-brand-600 animate-spin"
+                      className="inline-block text-brand-800 animate-spin"
                       size={48}
                       strokeWidth={1.75}
                       aria-hidden="true"
                     />
                   ) : (
                     <Inbox
-                      className="inline-block text-brand-600"
+                      className="inline-block text-brand-800"
                       size={48}
                       strokeWidth={1.75}
                       aria-hidden="true"

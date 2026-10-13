@@ -165,7 +165,7 @@ export default function InterviewResultDetailPage() {
           >
             <Link
               href="/user/interviews"
-              className="inline-flex h-9 items-center rounded bg-brand-600 px-4 text-sm font-medium text-white transition-colors duration-150 hover:bg-brand-700 hover:text-white"
+              className="inline-flex h-9 items-center rounded bg-brand-600 px-4 text-sm font-medium text-ink transition-colors duration-150 hover:bg-brand-500 hover:text-ink"
             >
               返回面试记录
             </Link>

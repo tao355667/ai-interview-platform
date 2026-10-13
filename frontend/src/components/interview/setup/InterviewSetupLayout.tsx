@@ -96,7 +96,7 @@ export default function InterviewSetupLayout({
               {guide.focus.map((item) => (
                 <li key={item.title} className="flex gap-3">
                   <CircleCheck
-                    className="h-[1em] w-[1em] shrink-0 mt-1 text-brand-600"
+                    className="h-[1em] w-[1em] shrink-0 mt-1 text-brand-800"
                     aria-hidden="true"
                   />
                   <div>

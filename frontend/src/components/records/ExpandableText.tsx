@@ -48,7 +48,7 @@ export default function ExpandableText({
         <button
           type="button"
           onClick={() => setExpanded((prev) => !prev)}
-          className="mt-1 text-sm font-medium text-brand-800 transition-colors duration-150 hover:text-brand-700 sm:hidden"
+          className="mt-1 text-sm font-medium text-brand-800 transition-colors duration-150 hover:text-brand-900 sm:hidden"
         >
           {expanded ? '收起' : '展开全文'}
         </button>

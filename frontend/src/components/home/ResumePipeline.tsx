@@ -48,7 +48,7 @@ export default function ResumePipeline() {
         {/* 局部薄荷色光晕 */}
         <div
           aria-hidden="true"
-          className="pointer-events-none absolute -right-40 -top-40 h-[480px] w-[480px] rounded-full bg-[radial-gradient(closest-side,rgba(167,243,208,0.18),transparent)]"
+          className="pointer-events-none absolute -right-40 -top-40 h-[480px] w-[480px] rounded-full bg-[radial-gradient(closest-side,rgba(217,245,138,0.16),transparent)]"
         />
         <div className="relative flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
           <SectionHeading
@@ -156,8 +156,8 @@ export default function ResumePipeline() {
                 delay={i * 0.4}
                 pathColor="#FFFFFF"
                 pathOpacity={0.1}
-                gradientStartColor="#10BB83"
-                gradientStopColor="#A7F3D0"
+                gradientStartColor="#BFEA2E"
+                gradientStopColor="#DDF59A"
               />
             ))}
           </div>

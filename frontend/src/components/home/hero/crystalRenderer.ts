@@ -39,6 +39,8 @@ export interface CrystalSim {
   cageSpin: number;
   /** 倾听能量（打字会提高它） */
   energy: number;
+  /** 打字累加起来的总量：丝线往水晶上缠的圈数，停下就停住，提交后归零 */
+  wind: number;
   /** 涟漪的起始时间（8 个） */
   impulses: Float32Array;
   /** 说话的音节：time, amp 交替（24 个） */
@@ -76,6 +78,7 @@ export function createSim(): CrystalSim {
     cageFlow: 0,
     cageSpin: 0,
     energy: 0,
+    wind: 0,
     impulses: new Float32Array(8).fill(-100),
     syllables,
     mouse: [-9999, -9999],
@@ -98,6 +101,7 @@ uniform float uTime;
 uniform vec2 uC;
 uniform float uS;
 uniform float uEnergy;
+uniform float uWind;
 uniform vec4 uImp[2];
 uniform vec4 uSyl[${SYL_VEC4}];
 uniform vec2 uMouse;
@@ -126,6 +130,19 @@ float speechEnv(float delay) {
     env += v.y * exp(-d1 * d1 * 30.0) + v.w * exp(-d2 * d2 * 30.0);
   }
   return min(env, 1.4);
+}
+
+// 这一段话整体的响度：把每个字的尖峰揉开（宽度约 1 秒），水晶随着整句话缓缓涨落，
+// 而不是逐字抖一下。叠起来的总量偏大，乘一个系数压回 0–1，保住起伏的层次
+float speechFlow() {
+  float env = 0.0;
+  for (int i = 0; i < ${SYL_VEC4}; i++) {
+    vec4 v = uSyl[i];
+    float d1 = uTime - v.x;
+    float d2 = uTime - v.z;
+    env += v.y * exp(-d1 * d1 * 1.1) + v.w * exp(-d2 * d2 * 1.1);
+  }
+  return min(env * 0.3, 1.0);
 }
 
 // 一次涟漪的波前：从 0 处出发，以 speed 向外走
@@ -165,35 +182,55 @@ vec3 ringIdle(float k, float lane, float a) {
   return orient(ringLocal(a, lane, R), ax, ay, az);
 }
 
-// 倾听：环转过来朝向对话卡片，变成同心的「耳廓」；每次键入，涟漪从外环向内收
+// 倾听：一开始是朝向对话卡片的同心「耳廓」；
+// 你每答一句，丝线就绕上水晶一圈，最后盘成绕在水晶身上的一股线（uWind 是累加出来的）
 vec3 ringListen(float k, float lane, float a) {
   float T = uTime;
-  float R = 0.84 + k * 0.17;
+  float w = smoothstep(0.0, 2.4, uWind);
+  // 每次键入向内收一下（打字已限流，不会逐字乱抖）
   float imp = 0.0;
   for (int i = 0; i < 2; i++) {
     vec4 v = uImp[i];
     float x = (2.0 - k) * 0.14;
     imp += pulseAt(v.x, x, 1.0, 9.0) + pulseAt(v.y, x, 1.0, 9.0) + pulseAt(v.z, x, 1.0, 9.0) + pulseAt(v.w, x, 1.0, 9.0);
   }
-  R -= imp * 0.08;
-  R += sin(a * 6.0 - T * 3.0) * 0.006 * (1.0 + uEnergy * 3.0);
-  return orient(ringLocal(a, lane, R), 0.42, 0.55, 0.0);
+  float shimmer = sin(a * 4.0 - T * 1.6) * 0.004 * (1.0 + uEnergy * 1.5);
+  // 耳廓：三圈同心、朝向卡片
+  float R0 = 0.84 + k * 0.17 - imp * 0.05 + shimmer;
+  vec3 ear = orient(ringLocal(a, lane, R0), 0.42, 0.55, 0.0);
+  // 缠绕：k 决定第几圈，三圈叠起来就是绕在水晶上的一股丝线
+  float rr = 0.70 + 0.04 * sin(a * 4.0 + k * 1.7) - imp * 0.03 + shimmer;
+  vec3 coil = orient(
+    vec3(cos(a + k * 1.2) * rr, (k - 1.0) * 0.30, sin(a + k * 1.2) * rr),
+    0.14 * (k - 1.0) + lane * 0.03,
+    T * 0.10,
+    0.06 * k
+  );
+  return mix(ear, coil, w);
 }
 
-// 思考：三道环像陀螺仪一样各自绕不同的轴旋转
-vec3 ringThink(float k, float lane, float a) {
+// 思考：三道环从各自松弛的姿态收拢，绞成一股，越绞越紧、转得越快；
+// 这就是卡片上写的「把三条线索编在一起」，形态上和整站的丝线是一回事
+vec3 ringThink(float k, float lane, float a, float braid) {
   float T = uTime;
-  vec3 p = ringLocal(a, lane, 0.9 + k * 0.07);
-  if (k < 0.5) return orient(p, PI * 0.5, T * 1.1, 0.35);
-  if (k < 1.5) return orient(p, 0.25, -T * 0.9, 0.0);
-  return orient(p, PI * 0.25, T * 0.7, -T * 0.6);
+  float b = smoothstep(0.0, 1.0, braid);
+  // 收拢后停在外壳外侧，不要糊在水晶上
+  float R = mix(0.94 + k * 0.09, 0.74 + k * 0.05, b);
+  // 绞紧时线束略微变宽，但不能宽到糊成一片
+  vec3 loop = ringLocal(a, lane * (1.0 + b * 0.6), R);
+  float spin = T * mix(0.5, 0.95, b);
+  // 松开：三圈各自歪着慢慢转（陀螺仪）
+  vec3 loose = orient(loop, PI * 0.5 - k * 0.5, spin + k * 2.1, 0.35 - k * 0.2);
+  // 绞紧：三股并成一个方向，相位错开，盘成一股绕竖轴的绳
+  vec3 wound = orient(loop, 0.3 + k * 0.45, spin * 1.1 + k * 2.1, k * 1.05);
+  return mix(loose, wound, b);
 }
 
 // 回应：环随每个字从内向外扩散，像一圈圈声波
 vec3 ringSpeak(float k, float lane, float a) {
   float T = uTime;
-  float env = speechEnv(k * 0.16);
-  float R = 0.98 + k * 0.17 + env * 0.16 + env * 0.05 * sin(a * 14.0 - T * 9.0 + k * 2.0);
+  float env = speechFlow();
+  float R = 0.98 + k * 0.17 + env * 0.14 + env * 0.03 * sin(a * 6.0 - T * 2.6 + k * 2.0);
   vec3 p = orient(ringLocal(a, lane, R), 1.02 + k * 0.06, 0.3 + T * 0.06, -0.12);
   return p + vec3(0.0, (k - 1.0) * 0.14 - env * 0.04, 0.0);
 }
@@ -205,7 +242,7 @@ vec3 ringAt(float u, float t, vec4 w) {
   vec3 p = vec3(0.0);
   if (w.x > 0.001) p += ringIdle(k, lane, a) * w.x;
   if (w.y > 0.001) p += ringListen(k, lane, a) * w.y;
-  if (w.z > 0.001) p += ringThink(k, lane, a) * w.z;
+  if (w.z > 0.001) p += ringThink(k, lane, a, w.z) * w.z;
   if (w.w > 0.001) p += ringSpeak(k, lane, a) * w.w;
   return p * (0.35 + 0.65 * uGrow);
 }
@@ -351,32 +388,36 @@ float smin(float a, float b, float k) {
 
 float gelSDF(vec3 p) {
   float T = uTime;
-  float env = speechEnv(0.0);
   vec3 dir = normalize(p + vec3(1e-4));
-  // 说话时随每个字搏动；开场提问（待命形态）也有轻微的搏动
-  float rad = 0.47 * uGrow + 0.012 * sin(T * 0.9) + env * (0.05 * uW.w + 0.025 * uW.x) + uExcite * 0.025;
-  // 倾听：每次键入，涟漪从朝向卡片的一侧沿表面散开
+  // 说话时整颗水晶缓缓地涨落（不跟着每个字抖）；开场提问（待命形态）也有轻微的起伏
+  float flowEnv = speechFlow();
+  float think = uW.z;
+  // 思考时轻轻吸一口气；说话时整颗水晶缓缓涨落（都不跟着每个字抖）
+  float rad = 0.47 * uGrow + 0.012 * sin(T * 0.9) + flowEnv * (0.055 * uW.w + 0.03 * uW.x) + uExcite * 0.025 - think * 0.02;
+  // 倾听：一列缓慢的行波从卡片那一侧推过来（连续的一整列，不是逐字一道涟漪）
   float th = acos(clamp(dot(dir, uLookDir), -1.0, 1.0));
+  rad += uW.y * (0.004 + 0.03 * uEnergy) * sin(th * 3.4 - T * 1.7);
+  // 偶然的一次涟漪（打字已限流）：很轻，只当是表面被碰了一下
   float rip = 0.0;
   for (int i = 0; i < 2; i++) {
     vec4 v = uImp[i];
-    rip += pulseAt(v.x, th, 1.5, 5.0) + pulseAt(v.y, th, 1.5, 5.0) + pulseAt(v.z, th, 1.5, 5.0) + pulseAt(v.w, th, 1.5, 5.0);
+    rip += pulseAt(v.x, th, 1.1, 2.6) + pulseAt(v.y, th, 1.1, 2.6) + pulseAt(v.z, th, 1.1, 2.6) + pulseAt(v.w, th, 1.1, 2.6);
   }
-  rad += rip * 0.04 * uW.y;
+  rad += rip * 0.016 * uW.y;
   // 指针：水晶朝光标方向微微鼓起
   vec3 md = normalize(vec3((uMouse - uC) / uS, -0.9));
   rad += uHover * 0.03 * pow(max(dot(dir, md), 0.0), 3.0);
-  float n = sin(p.x * 4.3 + T * 0.7) * sin(p.y * 3.7 - T * 0.55) * sin(p.z * 4.1 + T * 0.63);
-  float single = length(p) - rad - n * (0.022 + 0.05 * uW.w * env + 0.02 * uEnergy);
-  if (uW.z < 0.001) return single;
-  // 思考：水晶分成三滴，在外壳里互相环绕
-  float tb = 1e3;
-  for (int i = 0; i < 3; i++) {
-    float a = T * 1.3 + float(i) * TAU / 3.0;
-    vec3 c = vec3(cos(a) * 0.3, sin(a * 2.0 + float(i)) * 0.13, sin(a) * 0.3);
-    tb = smin(tb, length(p - c) - 0.27 * uGrow, 0.2);
-  }
-  return mix(single, tb, uW.z);
+  // 液态流动：整个场在缓慢自转，两层不同速度的起伏叠在一起，像壳里流动的液体
+  // 思考时内部流得更快（像被搅动的液体），表面浮起两道缓慢转动的绞痕
+  float Tm = T * (1.0 + 1.5 * think);
+  vec3 q1 = rotY(rotX(p, Tm * 0.24), Tm * 0.19);
+  vec3 q2 = rotY(rotX(p, -Tm * 0.13 + 1.7), Tm * 0.11 + 2.3);
+  float flow = sin(q1.x * 3.6 + Tm * 0.5) * sin(q1.y * 3.1 - Tm * 0.42) * sin(q1.z * 3.9 + Tm * 0.36);
+  float lipo = sin(q2.y * 6.4 - Tm * 0.62) * sin(q2.z * 5.7 + Tm * 0.55) * sin(q2.x * 6.1 - Tm * 0.48);
+  float liquid = flow * 0.72 + lipo * 0.28;
+  float twist = sin(atan(dir.z, dir.x) * 2.0 + T * 0.42) * sin(dir.y * 2.6 - T * 0.24);
+  liquid += twist * 0.55 * think;
+  return length(p) - rad - liquid * (0.026 + 0.03 * uW.w * flowEnv + 0.02 * uEnergy + 0.014 * think);
 }
 
 // 平滑求交：镂空切口带一点倒角，金属边缘更自然，也避免法线突变产生的锯齿亮点
@@ -390,7 +431,8 @@ float cageSDF(vec3 p) {
   float f = 4.8;
   vec3 r = q * f + vec3(0.0, uCage.x, 0.0);
   float gy = dot(sin(r), cos(r.yzx));
-  float open = uOpen + speechEnv(0.0) * 0.12 * uW.w;
+  // 外壳的镂空跟着整段话缓缓开合，不逐字闪
+  float open = uOpen + speechFlow() * 0.1 * uW.w;
   return smax(shell, (abs(gy) - open) / (f * 1.8), 0.012);
 }
 
@@ -581,6 +623,7 @@ const SHARED_UNIFORMS = [
   'uC',
   'uS',
   'uEnergy',
+  'uWind',
   'uImp',
   'uSyl',
   'uMouse',
@@ -739,6 +782,7 @@ export function createCrystalRenderer(
     gl.uniform2f(loc.uC, sim.cx, sim.cy);
     gl.uniform1f(loc.uS, sim.scale);
     gl.uniform1f(loc.uEnergy, sim.energy);
+    gl.uniform1f(loc.uWind, sim.wind);
     gl.uniform4fv(loc.uImp, sim.impulses);
     gl.uniform4fv(loc.uSyl, sim.syllables);
     gl.uniform2fv(loc.uMouse, sim.mouse);

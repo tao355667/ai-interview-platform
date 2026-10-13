@@ -108,6 +108,9 @@ export default function Hero({ debug = false }: { debug?: boolean }) {
   const speechRef = useRef<Speech | null>(null);
   const timersRef = useRef<number[]>([]);
   const exciteTargetRef = useRef(0);
+  const energyTargetRef = useRef(0);
+  const windTargetRef = useRef(0);
+  const lastRippleRef = useRef(-99);
   const prevAnswerRef = useRef('');
 
   const [webgl, setWebgl] = useState(true);
@@ -143,12 +146,19 @@ export default function Hero({ debug = false }: { debug?: boolean }) {
     setPhase(next);
   }, []);
 
-  /** 你打的每个字都在水晶表面激起一道朝向卡片的涟漪 */
+  /**
+   * 打在表面上的涟漪。打字是每 60ms 一个字，逐字都推一道波前会叠成一片抖动，
+   * 所以这里限流：最快 0.22 秒一次；力度也不直接跳，而是抬高目标值，由渲染循环平滑地追上去。
+   */
   const ripple = useCallback(() => {
     const sim = simRef.current;
+    if (sim.time - lastRippleRef.current < 0.22) return;
+    lastRippleRef.current = sim.time;
     sim.impulses.copyWithin(1, 0);
     sim.impulses[0] = sim.time;
-    sim.energy = Math.min(1, sim.energy + 0.3);
+    energyTargetRef.current = Math.min(1, energyTargetRef.current + 0.45);
+    // 每敲一段就多缠一点：丝线是一圈圈绕上去的，停下来就停在那里
+    windTargetRef.current = Math.min(2.6, windTargetRef.current + 1.1);
     dirtyRef.current = true;
   }, []);
 
@@ -190,6 +200,8 @@ export default function Hero({ debug = false }: { debug?: boolean }) {
       setAnswer('');
       prevAnswerRef.current = '';
       setStrands(0);
+      windTargetRef.current = 0;
+      energyTargetRef.current = 0;
       go('think', 1.9);
       later(() => setStrands(1), 500);
       later(() => setStrands(2), 1000);
@@ -254,6 +266,9 @@ export default function Hero({ debug = false }: { debug?: boolean }) {
     prevAnswerRef.current = '';
     setRound(1);
     setAutoTyping(false);
+    energyTargetRef.current = 0;
+    windTargetRef.current = 0;
+    lastRippleRef.current = -99;
     introStartRef.current = performance.now();
     setIntroKey((k) => k + 1);
     window.scrollTo({ top: 0 });
@@ -382,7 +397,12 @@ export default function Hero({ debug = false }: { debug?: boolean }) {
         sim.cageSpin += cage.spin * dt;
         sim.morph = Math.min(1, sim.morph + dt / morphDurRef.current);
         sim.w = sim.w.map((v, i) => approach(v, sim.to[i], 2.6, dt)) as Weights;
-        sim.energy *= Math.exp(-dt * 1.4);
+        // 打字带来的「能量」和缠绕都走平滑：目标缓慢回落，实际值追着目标走
+        energyTargetRef.current *= Math.exp(-dt * 0.9);
+        sim.energy = approach(sim.energy, energyTargetRef.current, 3.2, dt);
+        // 缠绕只在倾听时累积；提交后（wind 目标归零）缓缓松开
+        if (phaseRef.current !== 'listen') windTargetRef.current *= Math.exp(-dt * 1.6);
+        sim.wind = approach(sim.wind, windTargetRef.current, 1.4, dt);
         sim.excite = approach(sim.excite, exciteTargetRef.current, 4, dt);
 
         if (!introAskedRef.current && el > 2.8) {

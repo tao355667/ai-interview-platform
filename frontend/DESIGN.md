@@ -2,7 +2,7 @@
 
 风格：**高级浅色 SaaS（Premium Light SaaS）**。现代极简、字体排版有层次、Bento 网格、克制的微动效、具有 AI 产品特征。
 
-原则：高级感优先于炫酷感，统一性优先于特效数量，产品体验优先于视觉装饰。大胆只用在一处（首页首屏的「线索」装置），其余区域保持安静。
+原则：高级感优先于炫酷感，统一性优先于特效数量，产品体验优先于视觉装饰。首页是一件完整的作品：一根「线索」丝线从首屏贯穿到结尾（见下文「首页动态叙事」），其余页面保持安静。
 
 ## 颜色
 
@@ -27,7 +27,7 @@
 
 ### 渐变与光效（只允许以下几种）
 
-- 首屏装置背后的一团荧光、深色区块里的一团浅荧光光晕、结尾 CTA 顶部的柔光（`radial-gradient`，低透明度）
+- 首屏装置背后的一团荧光、深色区块里的一团浅荧光光晕、结尾 CTA 轨道环背后的柔光（`radial-gradient`，低透明度）
 - 首屏对话卡片的玻璃效果（`bg-white/60 backdrop-blur-xl shadow-glass`），只用在压在装置上的卡片
 - 主按钮顶部 1px 高光（`shadow-btn`）
 - 首屏淡网格底纹 `.bg-grid`
@@ -91,13 +91,52 @@
 | Bento 卡片 hover | `.spotlight` + 上浮 1px | 200ms |
 | 数字 | `<NumberTicker>` | 进入视口时滚动 |
 | 流程 / 协作连线 | `<AnimatedBeam>` | |
-| 首屏「线索」装置 | 自研 WebGL（`components/home/hero/crystalRenderer.ts`） | 镂空金属外壳 + 透明水晶 + 三道丝线轨道环；倾听 / 思考 / 追问三种形态；滚动时轨道环垂下接到「四种面试模式」卡片（`data-thread-anchor`）。调试页 `/lab/hero` |
+| 首屏「线索」装置 | 自研 WebGL（`components/home/hero/crystalRenderer.ts`） | 镂空金属外壳 + 透明水晶 + 三道丝线轨道环；倾听 / 思考 / 追问三种形态；滚动时轨道环垂下穿过「四种面试模式」的三个线孔（`data-thread-anchor`）。调试页 `/lab/hero` |
+| 章节大标题 | `<KineticText>` | 每个字从遮罩里升起，错峰 28ms，只播一次 |
+| 其余章节的丝线 | Canvas 2D（`components/home/silk/`） | 见下文 |
 
 规则：
 
-- 每屏最多 1–2 个持续运动的元素；声波等装饰动画默认静止，hover 时才运动
+- 首页以外：每屏最多 1–2 个持续运动的元素；声波等装饰动画默认静止，hover 时才运动
 - 只动 `transform` / `opacity`，不动宽高（进度条宽度除外）
-- 必须支持“减弱动态效果”：`MotionConfig reducedMotion="user"` 关闭位移动画；CSS 动画由 `globals.css` 的媒体查询统一关闭；首屏装置只渲染一帧静态画面；评价滚动条改为可手动横向滚动
+- 必须支持“减弱动态效果”：`MotionConfig reducedMotion="user"` 关闭位移动画；CSS 动画由 `globals.css` 的媒体查询统一关闭；首屏装置只渲染一帧静态画面；固定舞台（`lg:motion-safe:block`）换成纵向静态排列；丝线画布只画一帧最终状态
+
+### 首页动态叙事：线索
+
+主题是「从不确定，到从容」。首屏装置的三道丝线是全页唯一的视觉符号，在每一章变成那一章内容的结构，不另外加无关的装饰动画：
+
+| 章节 | 文件 | 丝线变成了什么 | 滚动方式 |
+|---|---|---|---|
+| 首屏 | `Hero.tsx` | 轨道环（WebGL）；滚动时断开、垂下，文字与玻璃卡片分层视差 | 普通 |
+| 四种面试模式 | `modes/ModesChapter.tsx` | 从线孔接入舞台：社招 = 一层层往下的追问链；校招 = 散开到三门基础课再绕回项目；专项 = 收束穿过一个技术栈；多人 = 穿过三位面试官落到「你」，提问的那束发亮 | 固定舞台 440vh，四段之间丝线形变 |
+| 简历押题（第二个高潮，唯一深色区块） | `resume/ResumeChapter.tsx` | 垂下接住简历 → 扫描 → 关键词被线拎出来 → 连成知识网络 → 引出面试题 → 排成清单 | 固定舞台 520vh，深色面板从圆角卡片展开到整屏 |
+| 面试反馈 | `feedback/FeedbackChapter.tsx` | 雷达的辐条和边、成长曲线；语音波形的播放头随滚动前进 | 普通，滚动驱动 |
+| 产品优势 | `advantages/AdvantagesChapter.tsx` | 一根横向长线：追问台阶（随难度切换）→ 时间尺 → 声波 → 打结 | 固定后横向移动 |
+| 用户反馈 | `Testimonials.tsx` | 沿行间空隙穿行，只从被荧光笔划出的那句话下面经过 | 普通 |
+| 结尾（第三个高潮） | `FaqCta.tsx` | 散开的线汇聚回首屏的三道轨道环，前半圈压在标题前面 | 普通 |
+
+性能（改动前后在同一台机器上量过，4 倍 CPU 降速 + devicePixelRatio 2 滚动整页）：
+
+| 章节 | 改前每帧主线程 | 改后每帧主线程 |
+|---|---|---|
+| 面试模式 | 22.6ms（p95 55ms） | 10.0ms |
+| 简历押题 | 21.4ms | 9.2ms |
+| 面试反馈 | 28.9ms | 10.1ms |
+| 产品优势 | 20.7ms | 5.5ms |
+| 用户反馈 | 22.1ms | 6.4ms |
+
+- `drawRibbon` 把同一档颜色收进同一个 `Path2D`，一束丝线最多描边 7 次；画布外的线段跳过
+- `spline` / `resample` 用模块级缓冲区，不逐帧分配
+- 样式写入走 `setStyle`（先比对上一次的值），避免重复触发样式重算
+- `useSilkCanvas` 会在绘制耗时超标时自动降级：先降像素密度，再减细线根数（只降不升，避免来回抖动）
+- 只有环境动画、没有滚动时降到 30fps
+
+实现约定：
+
+- 丝线统一用 `silk/silk.ts` 的 `drawRibbon`（一束细线，沿长度扭转，按前后取色），颜色只用 `SILK_LIGHT` / `SILK_DARK` / `SILK_GLOW`
+- 画布统一用 `silk/useSilkCanvas.ts`：按像素密度缩放、只在可见时运行动画循环、卸载时清理；滚动进度用 Motion 的 `useScroll`，在画布里平滑追赶
+- 每一帧先读布局（`getBoundingClientRect`），再写样式，避免强制同步布局
+- 演示数据（分数、点评、语音、简历）必须标注「示例」，不得伪造真实用户；评价和统计仍是占位内容
 
 ## 组件与来源
 
@@ -106,6 +145,7 @@
 | `NumberTicker` / `AnimatedBeam` | `src/components/motion/` | 移植自 [Magic UI](https://magicui.design/)（MIT），改为 Tailwind v3 + `m` 组件 |
 | `Spotlight` | `src/components/motion/` | 思路参考 [React Bits](https://reactbits.dev/) Spotlight Card，纯 CSS 变量实现 |
 | `Reveal` / `MotionProvider` | `src/components/motion/` | 基于 [Motion](https://motion.dev/) |
+| `KineticText` | `src/components/motion/` | 自研，纯 CSS 过渡 |
 | 图标 | `lucide-react` | 装饰图标加 `aria-hidden`，纯图标按钮必须有中文 `aria-label` |
 
 不要引入 shadcn CLI、Tailwind v4 或 GSAP；需要新组件时手工移植并适配本规范。

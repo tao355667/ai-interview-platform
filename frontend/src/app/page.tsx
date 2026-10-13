@@ -1,8 +1,8 @@
 import Hero from '@/components/home/Hero';
-import ModeBento from '@/components/home/ModeBento';
-import ResumePipeline from '@/components/home/ResumePipeline';
-import CapabilityBento from '@/components/home/CapabilityBento';
-import StatsBand from '@/components/home/StatsBand';
+import ModesChapter from '@/components/home/modes/ModesChapter';
+import ResumeChapter from '@/components/home/resume/ResumeChapter';
+import FeedbackChapter from '@/components/home/feedback/FeedbackChapter';
+import AdvantagesChapter from '@/components/home/advantages/AdvantagesChapter';
 import Testimonials from '@/components/home/Testimonials';
 import FaqCta from '@/components/home/FaqCta';
 
@@ -11,10 +11,10 @@ export default function Home() {
   return (
     <>
       <Hero />
-      <ModeBento />
-      <ResumePipeline />
-      <CapabilityBento />
-      <StatsBand />
+      <ModesChapter />
+      <ResumeChapter />
+      <FeedbackChapter />
+      <AdvantagesChapter />
       <Testimonials />
       <FaqCta />
     </>

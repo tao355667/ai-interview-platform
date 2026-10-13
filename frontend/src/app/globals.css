@@ -93,12 +93,37 @@ body {
     mask-image: radial-gradient(ellipse 70% 60% at 50% 0%, #000 40%, transparent 100%);
   }
 
-  /* 首屏轨道环接上卡片时，卡片边框亮起 */
-  .thread-port[data-attached='true'] {
-    border-color: #9cc41a;
-    box-shadow:
-      0 1px 2px rgba(14, 26, 21, 0.05),
-      0 18px 40px -20px rgba(77, 106, 6, 0.35);
+  /* 动态文字：每个字从遮罩里升起（KineticText） */
+  .kinetic-mask {
+    display: inline-block;
+    overflow: hidden;
+    vertical-align: top;
+    padding-bottom: 0.1em;
+    margin-bottom: -0.1em;
+  }
+  .kinetic-ch {
+    display: inline-block;
+    transform: translateY(110%);
+    transition: transform 0.9s var(--ease-out) var(--d, 0ms);
+  }
+  .kinetic[data-in] .kinetic-ch {
+    transform: none;
+  }
+
+  /* 线孔：首屏的轨道环滚动时从这里穿过，接进「四种面试模式」的舞台 */
+  .thread-eye {
+    display: block;
+    height: 12px;
+    border-radius: 999px;
+    border: 1.5px solid #cdd4d0;
+    background: #f7f8f7;
+    transition:
+      border-color 0.4s var(--ease-out),
+      box-shadow 0.4s var(--ease-out);
+  }
+  .thread-eye[data-attached='true'] {
+    border-color: #4d6a06;
+    box-shadow: 0 0 0 4px rgba(191, 234, 46, 0.35);
   }
 
   /* 光标跟随柔光：由 Spotlight 组件写入 --mx / --my */

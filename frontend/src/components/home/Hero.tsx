@@ -6,6 +6,7 @@ import type { CSSProperties, FormEvent, KeyboardEvent } from 'react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { cn } from '@/lib/cn';
 import { SHIELD_SLOTS, createCrystalRenderer, createSim } from './hero/crystalRenderer';
+import { setStyle } from './silk/silk';
 import type { CrystalSim } from './hero/crystalRenderer';
 import { OPENING_QUESTION, SAMPLE_ANSWER, pickFollowUp, syllablesOf } from './hero/script';
 import s from './hero/hero.module.css';
@@ -96,6 +97,7 @@ export default function Hero({ debug = false }: { debug?: boolean }) {
   const stageRef = useRef<HTMLDivElement>(null);
   const textRef = useRef<HTMLDivElement>(null);
   const formRef = useRef<HTMLFormElement>(null);
+  const cardRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const simRef = useRef<CrystalSim>(createSim());
   const dirtyRef = useRef(true);
@@ -305,10 +307,12 @@ export default function Hero({ debug = false }: { debug?: boolean }) {
     const anchorEls = Array.from(
       document.querySelectorAll<HTMLElement>('[data-thread-anchor]')
     ).slice(0, 3);
+    const shieldEls = Array.from(document.querySelectorAll<HTMLElement>('[data-shield]'));
     let last = performance.now();
     introStartRef.current = last;
     let slowFrames = 0;
     let raf = 0;
+    let parked = false;
 
     const frame = (now: number) => {
       raf = requestAnimationFrame(frame);
@@ -320,6 +324,18 @@ export default function Hero({ debug = false }: { debug?: boolean }) {
       const y = window.scrollY;
       const el = (now - introStartRef.current) / 1000;
       const ph = phaseRef.current;
+
+      // 滚到很下面时首屏已经完全看不见：清空一次画布，之后不再计算
+      if (y > h * 2.4) {
+        if (!parked) {
+          sim.fade = 0;
+          renderer.render(sim);
+          parked = true;
+        }
+        return;
+      }
+      parked = false;
+      if (sim.fade < 1) sim.fade = 1;
 
       // 帧率不够时降低核心的渲染分辨率（线条不受影响）
       if (!still && rawDt > 0.024 && el > 4) {
@@ -432,12 +448,31 @@ export default function Hero({ debug = false }: { debug?: boolean }) {
         anchorsY.push(r.top);
       });
       const firstAnchor = anchorsY.length ? Math.min(...anchorsY) : h * 2;
+      // 线从文字后面经过时变淡：首屏的文字，以及下一节的大标题（只取在屏幕上的）
       sim.shield.fill(-1e4);
-      textRef.current?.querySelectorAll('[data-shield]').forEach((node, i) => {
-        if (i >= SHIELD_SLOTS) return;
+      let slot = 0;
+      for (const node of shieldEls) {
+        if (slot >= SHIELD_SLOTS) break;
         const r = node.getBoundingClientRect();
-        sim.shield.set([r.left, r.top, r.right, r.bottom], i * 4);
-      });
+        if (r.bottom < -40 || r.top > h + 40) continue;
+        sim.shield.set([r.left, r.top, r.right, r.bottom], slot++ * 4);
+      }
+
+      // 分层视差：文字比页面走得快一点、淡出；玻璃卡片走得慢一点
+      if (!still && y < h * 1.5 && window.innerWidth >= 1024) {
+        const k = clamp01(y / (h * 0.7));
+        if (textRef.current) {
+          setStyle(textRef.current, {
+            transform: `translate3d(0, ${(-y * 0.12).toFixed(1)}px, 0)`,
+            opacity: String(1 - k * 0.85),
+          });
+        }
+        if (cardRef.current) {
+          setStyle(cardRef.current, {
+            transform: `translate3d(0, ${(y * 0.1).toFixed(1)}px, 0)`,
+          });
+        }
+      }
       if (still || anchorEls.length < 3) {
         sim.scroll = 0;
         sim.fade = 1 - clamp01(y / (h * 0.8));
@@ -651,7 +686,10 @@ export default function Hero({ debug = false }: { debug?: boolean }) {
         </div>
 
         {/* 玻璃对话卡片：压在水晶的右下缘，透过它能看到后面的装置 */}
-        <div className="relative z-20 w-full max-w-[420px] lg:absolute lg:bottom-[6vh] lg:right-[-2%] lg:w-[360px]">
+        <div
+          ref={cardRef}
+          className="relative z-20 w-full max-w-[420px] lg:absolute lg:bottom-[6vh] lg:right-[-2%] lg:w-[360px]"
+        >
           <form
             ref={formRef}
             onSubmit={onSubmit}

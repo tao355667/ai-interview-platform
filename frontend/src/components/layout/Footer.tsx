@@ -23,7 +23,7 @@ const Footer: FC = () => {
       <div className="page grid gap-8 py-10 sm:grid-cols-2 lg:grid-cols-4">
         <div className="lg:col-span-2">
           <div className="flex items-center gap-2">
-            <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-brand-600 text-sm font-semibold text-white shadow-btn">
+            <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-brand-600 text-sm font-semibold text-ink shadow-btn">
               面
             </span>
             <span className="font-semibold text-ink">面试吧</span>

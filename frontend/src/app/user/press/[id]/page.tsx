@@ -31,7 +31,7 @@ function Section({
   return (
     <section>
       <h3 className="mb-3 flex items-center gap-2 text-base font-semibold text-ink">
-        <span className="text-brand-600">{icon}</span>
+        <span className="text-brand-800">{icon}</span>
         {title}
       </h3>
       {children}
@@ -149,7 +149,7 @@ export default function PressDetailPage() {
                     aria-current={active ? 'true' : undefined}
                     className={`flex w-full gap-2 border-l-2 px-4 py-2.5 text-left text-sm transition-colors duration-150 ${
                       active
-                        ? 'border-brand-600 bg-brand-50 text-brand-800'
+                        ? 'border-brand-700 bg-brand-50 text-brand-800'
                         : 'border-transparent text-ink hover:bg-canvas'
                     }`}
                   >

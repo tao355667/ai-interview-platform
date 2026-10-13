@@ -19,12 +19,12 @@ body {
 }
 
 ::selection {
-  background: #d0f1e3;
+  background: #ddf59a;
 }
 
-/* 键盘焦点：统一用主色描边 */
+/* 键盘焦点：深橄榄描边（荧光黄绿在白底上不够清楚） */
 :focus-visible {
-  outline: 2px solid #10bb83;
+  outline: 2px solid #4d6a06;
   outline-offset: 2px;
 }
 
@@ -54,7 +54,7 @@ body {
     @apply inline-flex h-11 items-center justify-center gap-2 rounded-[10px] px-5 text-[15px] font-medium transition-[background-color,border-color,box-shadow,transform,color] duration-150 active:translate-y-0;
   }
   .link-btn-primary {
-    @apply link-btn bg-brand-600 text-white shadow-btn hover:-translate-y-px hover:bg-brand-700 hover:text-white;
+    @apply link-btn bg-brand-600 text-ink shadow-btn hover:-translate-y-px hover:bg-brand-500 hover:text-ink;
   }
   .link-btn-default {
     @apply link-btn border border-line-strong bg-white text-ink shadow-xs hover:-translate-y-px hover:border-ink/25 hover:text-ink;
@@ -65,6 +65,21 @@ body {
 }
 
 @layer utilities {
+  /* 荧光笔：给关键词划一道荧光黄绿，文字保持墨黑。加 animate-mark 可以在出现时划过去 */
+  .mark {
+    background-image: linear-gradient(
+      transparent 58%,
+      rgba(191, 234, 46, 0.85) 58%,
+      rgba(191, 234, 46, 0.85) 92%,
+      transparent 92%
+    );
+    background-repeat: no-repeat;
+    background-size: 100% 100%;
+    -webkit-box-decoration-break: clone;
+    box-decoration-break: clone;
+    padding: 0 0.06em;
+  }
+
   .animate-fade-in {
     animation: fadeIn 0.2s ease-out both;
   }
@@ -76,6 +91,14 @@ body {
     background-size: 48px 48px;
     -webkit-mask-image: radial-gradient(ellipse 70% 60% at 50% 0%, #000 40%, transparent 100%);
     mask-image: radial-gradient(ellipse 70% 60% at 50% 0%, #000 40%, transparent 100%);
+  }
+
+  /* 首屏轨道环接上卡片时，卡片边框亮起 */
+  .thread-port[data-attached='true'] {
+    border-color: #9cc41a;
+    box-shadow:
+      0 1px 2px rgba(14, 26, 21, 0.05),
+      0 18px 40px -20px rgba(77, 106, 6, 0.35);
   }
 
   /* 光标跟随柔光：由 Spotlight 组件写入 --mx / --my */
@@ -97,7 +120,7 @@ body {
     z-index: -1;
     background: radial-gradient(
       420px circle at var(--mx, 50%) var(--my, 50%),
-      rgba(16, 187, 131, 0.09),
+      rgba(191, 234, 46, 0.16),
       transparent 45%
     );
   }
@@ -107,7 +130,7 @@ body {
     padding: 1px;
     background: radial-gradient(
       260px circle at var(--mx, 50%) var(--my, 50%),
-      rgba(16, 187, 131, 0.55),
+      rgba(156, 196, 26, 0.7),
       transparent 60%
     );
     -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);

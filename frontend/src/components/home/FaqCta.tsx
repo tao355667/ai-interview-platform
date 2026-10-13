@@ -50,7 +50,7 @@ export default function FaqCta() {
         <div className="relative overflow-hidden rounded-[28px] border border-line bg-white px-6 py-16 text-center shadow-card sm:px-12">
           <div
             aria-hidden="true"
-            className="pointer-events-none absolute left-1/2 top-0 h-[280px] w-[640px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-[radial-gradient(closest-side,rgba(16,187,131,0.18),transparent)]"
+            className="pointer-events-none absolute left-1/2 top-0 h-[280px] w-[640px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-[radial-gradient(closest-side,rgba(191,234,46,0.35),transparent)]"
           />
           <h2 className="relative text-balance text-title text-ink">
             {phrases('下一场面试之前，先在这里练一次')}

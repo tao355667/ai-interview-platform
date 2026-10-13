@@ -271,7 +271,7 @@ const Navbar: FC = () => {
     >
       <div className="page flex h-full items-center justify-between gap-4">
         <Link href="/" className="flex shrink-0 items-center gap-2.5" aria-label="面试吧首页">
-          <span className="flex h-8 w-8 items-center justify-center rounded-[9px] bg-brand-600 text-[15px] font-semibold text-white shadow-btn">
+          <span className="flex h-8 w-8 items-center justify-center rounded-[9px] bg-brand-600 text-[15px] font-semibold text-ink shadow-btn">
             面
           </span>
           <span className="text-[17px] font-semibold tracking-tight text-ink">面试吧</span>

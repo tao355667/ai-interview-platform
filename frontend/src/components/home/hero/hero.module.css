@@ -1,0 +1,82 @@
+/* 首屏的入场动画。减弱动态效果时直接显示最终状态 */
+
+.rise {
+  animation: rise 0.9s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+  animation-delay: calc(var(--d, 0) * 1ms);
+}
+
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* 标题按行从遮罩下方升起 */
+.lineMask {
+  display: block;
+  overflow: hidden;
+  padding-bottom: 0.08em;
+  margin-bottom: -0.08em;
+}
+.lineInner {
+  display: block;
+  animation: lineUp 1s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  animation-delay: calc(var(--d, 0) * 1ms);
+}
+@keyframes lineUp {
+  from {
+    transform: translateY(102%);
+  }
+  to {
+    transform: none;
+  }
+}
+
+/* 思考时的三条线索标签依次出现 */
+.strand {
+  animation: strandIn 0.5s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+}
+@keyframes strandIn {
+  from {
+    opacity: 0;
+    transform: translateX(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* 状态点：倾听时呼吸，思考和提问时更快 */
+.pulse {
+  animation: pulse 1.6s ease-in-out infinite;
+}
+.pulseFast {
+  animation: pulse 0.7s ease-in-out infinite;
+}
+@keyframes pulse {
+  0%,
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: scale(2);
+    opacity: 0.3;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rise,
+  .lineInner,
+  .strand,
+  .pulse,
+  .pulseFast {
+    animation: none;
+  }
+}

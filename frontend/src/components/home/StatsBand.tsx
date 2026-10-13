@@ -20,7 +20,7 @@ export default function StatsBand() {
               ) : (
                 <span className="tabular-nums">{s.value}</span>
               )}
-              {s.suffix && <span className="text-brand-700">{s.suffix}</span>}
+              {s.suffix && <span className="text-brand-800">{s.suffix}</span>}
             </dd>
             <dt className="mt-3 text-sm text-ink-secondary">{s.label}</dt>
           </div>

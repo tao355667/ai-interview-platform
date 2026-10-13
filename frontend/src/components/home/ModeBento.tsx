@@ -14,18 +14,22 @@ function ModeCard({
   className,
   children,
   cta,
+  anchor = false,
 }: {
   kind: InterviewKind;
   className?: string;
   children?: ReactNode;
   cta: string;
+  /** 首屏的轨道环滚动时会垂下来接到这张卡片上 */
+  anchor?: boolean;
 }) {
   const t = INTERVIEW_TYPES[kind];
   return (
     <Spotlight className={cn('rounded-tile', className)}>
       <Link
         href={t.href}
-        className="group flex h-full flex-col rounded-tile border border-line bg-white p-6 shadow-card transition-[box-shadow,transform] duration-200 hover:-translate-y-px hover:shadow-card-hover sm:p-7"
+        data-thread-anchor={anchor || undefined}
+        className="thread-port group flex h-full flex-col rounded-tile border border-line bg-white p-6 shadow-card transition-[box-shadow,transform,border-color] duration-200 hover:-translate-y-px hover:shadow-card-hover sm:p-7"
       >
         <span
           className={cn(
@@ -116,7 +120,7 @@ function FollowUpChain() {
 
 export default function ModeBento() {
   return (
-    <section id="modes" className="scroll-mt-20 page py-24">
+    <section id="modes" className="page relative scroll-mt-20 py-24">
       <SectionHeading
         eyebrow="四种面试模式"
         title="从校招基础到多人面试，按你的阶段来练"
@@ -124,17 +128,17 @@ export default function ModeBento() {
       />
       <div className="mt-12 grid gap-4 lg:grid-cols-3">
         <Reveal className="lg:col-span-2 lg:row-span-2">
-          <ModeCard kind="social" cta="开始社招面试" className="h-full">
+          <ModeCard kind="social" cta="开始社招面试" className="h-full" anchor>
             <FollowUpChain />
           </ModeCard>
         </Reveal>
         <Reveal delay={0.06}>
-          <ModeCard kind="campus" cta="开始校招面试" className="h-full">
+          <ModeCard kind="campus" cta="开始校招面试" className="h-full" anchor>
             <Chips items={['计算机网络', '操作系统', '数据结构', '项目经历']} />
           </ModeCard>
         </Reveal>
         <Reveal delay={0.12}>
-          <ModeCard kind="special" cta="选择技术栈" className="h-full">
+          <ModeCard kind="special" cta="选择技术栈" className="h-full" anchor>
             <Chips items={['Go', 'Java', 'Redis', 'MySQL', '系统设计']} />
           </ModeCard>
         </Reveal>

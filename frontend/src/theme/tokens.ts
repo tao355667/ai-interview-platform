@@ -2,13 +2,15 @@ import type { ThemeConfig } from 'antd';
 
 // 设计令牌：与 tailwind.config.js 中的颜色保持一致
 export const colors = {
-  brand: '#10BB83',
-  brandHover: '#0E9F70',
-  brandActive: '#0B7F59',
-  /** 绿色文字和链接：#10BB83 直接做文字对比度不够 */
-  brandText: '#0B7F59',
-  brandSoft: '#E8F8F1',
-  brandBorder: '#A8E4CC',
+  /** 荧光黄绿：只做填充，上面的文字用 ink */
+  brand: '#BFEA2E',
+  brandHover: '#CFF25A',
+  brandActive: '#9CC41A',
+  /** 浅底上的文字和链接：荧光黄绿直接做文字对比度只有约 1.4:1 */
+  brandText: '#4D6A06',
+  brandTextHover: '#36490A',
+  brandSoft: '#F7FDE7',
+  brandBorder: '#DDF59A',
   accent: '#1266D0',
   canvas: '#F7F8F7',
   surface: '#FFFFFF',
@@ -34,8 +36,8 @@ export const antdTheme: ThemeConfig = {
     colorPrimaryHover: colors.brandHover,
     colorPrimaryActive: colors.brandActive,
     colorPrimaryText: colors.brandText,
-    colorPrimaryTextHover: colors.brandHover,
-    colorPrimaryTextActive: colors.brandActive,
+    colorPrimaryTextHover: colors.brandTextHover,
+    colorPrimaryTextActive: colors.brandTextHover,
     colorPrimaryBg: colors.brandSoft,
     colorPrimaryBorder: colors.brandBorder,
     colorInfo: colors.accent,
@@ -43,8 +45,8 @@ export const antdTheme: ThemeConfig = {
     colorWarning: colors.warning,
     colorError: colors.danger,
     colorLink: colors.brandText,
-    colorLinkHover: colors.brandHover,
-    colorLinkActive: colors.brandActive,
+    colorLinkHover: colors.brandTextHover,
+    colorLinkActive: colors.brandTextHover,
     colorText: colors.ink,
     colorTextSecondary: colors.inkSecondary,
     colorTextTertiary: colors.inkMuted,
@@ -66,7 +68,13 @@ export const antdTheme: ThemeConfig = {
   },
   components: {
     Button: {
-      primaryShadow: 'inset 0 1px 0 rgba(255, 255, 255, 0.22), 0 1px 2px rgba(11, 127, 89, 0.32)',
+      // 荧光黄绿按钮上用墨黑文字；默认按钮悬停时只加深边框，文字保持墨黑
+      primaryColor: colors.ink,
+      primaryShadow: 'inset 0 1px 0 rgba(255, 255, 255, 0.45), 0 1px 2px rgba(77, 106, 6, 0.35)',
+      defaultHoverColor: colors.ink,
+      defaultHoverBorderColor: colors.brandText,
+      defaultActiveColor: colors.ink,
+      defaultActiveBorderColor: colors.brandText,
       defaultShadow: '0 1px 2px rgba(14, 26, 21, 0.04)',
       dangerShadow: 'none',
       fontWeight: 500,
@@ -81,6 +89,31 @@ export const antdTheme: ThemeConfig = {
       footerBg: colors.surface,
       bodyBg: colors.canvas,
     },
+    Input: {
+      hoverBorderColor: colors.brandActive,
+      activeBorderColor: colors.brandText,
+      activeShadow: '0 0 0 3px rgba(191, 234, 46, 0.35)',
+    },
+    Select: {
+      hoverBorderColor: colors.brandActive,
+      activeBorderColor: colors.brandText,
+      activeOutlineColor: 'rgba(191, 234, 46, 0.35)',
+      optionSelectedBg: colors.brandSoft,
+      optionSelectedColor: colors.ink,
+    },
+    Pagination: {
+      itemActiveBg: colors.brand,
+      itemActiveColor: colors.ink,
+      itemActiveColorHover: colors.ink,
+      colorPrimary: colors.brandText,
+      colorPrimaryHover: colors.brandTextHover,
+    },
+    Steps: {
+      colorTextLightSolid: colors.ink,
+    },
+    Dropdown: {
+      colorPrimary: colors.brandText,
+    },
     Menu: {
       itemSelectedBg: colors.brandSoft,
       itemSelectedColor: colors.brandText,
@@ -90,9 +123,10 @@ export const antdTheme: ThemeConfig = {
       headerColor: colors.inkSecondary,
     },
     Tabs: {
-      itemSelectedColor: colors.brandText,
-      itemHoverColor: colors.brandHover,
-      inkBarColor: colors.brand,
+      itemSelectedColor: colors.ink,
+      itemHoverColor: colors.brandText,
+      itemActiveColor: colors.brandText,
+      inkBarColor: colors.brandText,
     },
   },
 };

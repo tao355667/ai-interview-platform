@@ -4,7 +4,7 @@ import ModesChapter from '@/components/home/modes/ModesChapter';
 
 // 首屏调试页：和首页同一个组件，多一条状态切换的调试条，不进搜索引擎
 export const metadata: Metadata = {
-  title: '首屏调试 - 面试吧',
+  title: '首屏调试 - 面策',
   robots: { index: false, follow: false },
 };
 

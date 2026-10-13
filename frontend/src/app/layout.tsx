@@ -5,7 +5,7 @@ import Navbar from '@/components/layout/Navbar';
 import Footer from '@/components/layout/Footer';
 
 export const metadata: Metadata = {
-  title: '面试吧 - AI 模拟面试平台',
+  title: '面策 - AI 模拟面试平台',
   description: '基于真实大厂题库的 AI 模拟面试与简历押题平台',
 };
 

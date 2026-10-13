@@ -26,7 +26,7 @@ const Footer: FC = () => {
             <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-brand-600 text-sm font-semibold text-ink shadow-btn">
               面
             </span>
-            <span className="font-semibold text-ink">面试吧</span>
+            <span className="font-semibold text-ink">面策</span>
           </div>
           <p className="mt-3 max-w-sm text-sm leading-6 text-ink-secondary">
             基于真实大厂题库的 AI 模拟面试平台，从简历押题到专项突破，帮你在面试前发现并补上短板。
@@ -64,7 +64,7 @@ const Footer: FC = () => {
       </div>
       <div className="border-t border-line">
         <div className="page py-4 text-xs text-ink-secondary">
-          © {new Date().getFullYear()} 面试吧
+          © {new Date().getFullYear()} 面策
         </div>
       </div>
     </footer>

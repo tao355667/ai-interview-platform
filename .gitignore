@@ -21,3 +21,27 @@ frontend/next/
 /tmp/
 # 忽略营销文档
 doc/营销/
+
+# AI 编码助手的配置（Claude Code 的 .claude/，以及其他代理工具的 .agent/、.agents/）
+# 保留和开发相关、换台电脑也一样的部分：项目设置 settings.json、命令、子代理、技能、hooks、
+# 规则、预览服务的 launch.json，以及 CLAUDE.md / AGENTS.md
+# 下面只忽略跟本机有关的部分
+# 本机的个人设置和权限、个人备忘
+.claude/settings.local.json
+.claude/**/*.local.*
+CLAUDE.local.md
+**/CLAUDE.local.md
+# 本机创建的 git worktree 和只在本机运行的定时任务
+.claude/worktrees/
+.claude/scheduled_tasks.json
+# 其他代理工具的本机文件：个人覆盖配置、缓存、日志、会话记录
+.agent/**/*.local.*
+.agents/**/*.local.*
+.agent/cache/
+.agent/logs/
+.agent/tmp/
+.agent/sessions/
+.agents/cache/
+.agents/logs/
+.agents/tmp/
+.agents/sessions/

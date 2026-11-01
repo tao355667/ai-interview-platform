@@ -246,3 +246,7 @@ xiangmu-image/                   # README 页面截图
 ## License
 
 见 [LICENSE](LICENSE)。
+
+## 致谢
+
+本项目基于 [wangzhongyang00/go-ai-eino-mianshiba](https://github.com/wangzhongyang00/go-ai-eino-mianshiba) 的进一步开发，感谢原作者的开源工作。
